@@ -6,6 +6,8 @@ namespace HDSSolutions\Laravel\AppSyncEvents;
 
 use HDSSolutions\Laravel\AppSyncEvents\Auth\TokenSigner;
 use HDSSolutions\Laravel\AppSyncEvents\Broadcasting\AppSyncBroadcaster;
+use HDSSolutions\Laravel\AppSyncEvents\Console\InstallCommand;
+use HDSSolutions\Laravel\AppSyncEvents\Console\SecretCommand;
 use HDSSolutions\Laravel\AppSyncEvents\Exceptions\ConfigurationException;
 use HDSSolutions\Laravel\AppSyncEvents\Http\ClientConfigController;
 use HDSSolutions\Laravel\AppSyncEvents\Lambda\AppSyncAuthorizer;
@@ -47,6 +49,13 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/appsync-events.php' => config_path('appsync-events.php'),
         ], ['appsync-events-config', 'config']);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SecretCommand::class,
+                InstallCommand::class,
+            ]);
+        }
 
         $this->app->booted(function (): void {
             $this->registerAuthRoute();
