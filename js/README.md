@@ -28,7 +28,7 @@ const echo = new Echo(appSyncEchoOptions({
     connectToken: () => fetchConnectToken(), // re-evaluated on every (re)connect
 }));
 
-echo.private('orders.1').listen('.OrderShipped', (e) => {
+echo.private('orders.1').listen('.OrderShipped', (e: unknown) => {
     console.log(e);
 });
 ```
