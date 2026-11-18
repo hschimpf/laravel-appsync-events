@@ -98,8 +98,16 @@ fi
 AWS_ACCESS_KEY_ID="$(awk -F' *= *' '/aws_access_key_id/{print $2}' "${CREDENTIALS_FILE}")"
 AWS_SECRET_ACCESS_KEY="$(awk -F' *= *' '/aws_secret_access_key/{print $2}' "${CREDENTIALS_FILE}")"
 
+# Machine-readable config consumed by the PHP and JS emulator test
+# harnesses (see tests/emulator/README.md for the lookup precedence).
+cat > "${RUNTIME_DIR}/${PORT}/emulator.json" <<EOF
+{"endpoint":"https://127.0.0.1:${PORT}","caBundle":"${CA_FILE}","accessKeyId":"${AWS_ACCESS_KEY_ID}","secretAccessKey":"${AWS_SECRET_ACCESS_KEY}","region":"us-east-1"}
+EOF
+
 cat <<EOF
 Emulator is healthy on https://127.0.0.1:${PORT} (data-plane ports: ${LISTENER_PORT_RANGE}).
+
+Config written to ${RUNTIME_DIR}/${PORT}/emulator.json
 
 Export these to point the AWS CLI/SDKs at it:
 
