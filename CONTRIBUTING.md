@@ -110,3 +110,17 @@ Prerequisites to configure once:
   workflow grants `id-token: write` for the attestation.
 - The Packagist package must be registered with the GitHub webhook/app
   enabled so tags publish to Packagist automatically.
+
+### Manual publish fallback
+
+`js/package.json` sets `publishConfig.provenance: true`, and provenance
+can only be issued inside a supported CI OIDC environment. A **real**
+manual `npm publish` therefore fails outside GitHub Actions (`--dry-run`
+still works — it performs no attestation). If a manual publish is ever
+needed, disable provenance for that run:
+
+```bash
+npm publish --access public --provenance=false
+```
+
+Prefer the release workflow — it is the documented, attested path.
