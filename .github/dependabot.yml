@@ -17,6 +17,11 @@ updates:
       schedule:
           interval: weekly
       open-pull-requests-limit: 5
+      # tsup builds declarations through the TypeScript 6 compiler API;
+      # typescript 7.x breaks the dts build until tsup supports it.
+      ignore:
+          - dependency-name: typescript
+            update-types: [version-update:semver-major]
       groups:
           npm-minor-patch:
               update-types: [minor, patch]
