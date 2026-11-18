@@ -22,4 +22,15 @@ abstract class TestCase extends Orchestra
             AppSyncEventsServiceProvider::class,
         ];
     }
+
+    /**
+     * Define the environment for the test application.
+     *
+     * @param  Application  $app
+     */
+    protected function defineEnvironment($app)
+    {
+        // Required by the `web` middleware group (encrypted cookies).
+        $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
+    }
 }

@@ -7,10 +7,14 @@ namespace HDSSolutions\Laravel\AppSyncEvents;
 use HDSSolutions\Laravel\AppSyncEvents\Auth\TokenSigner;
 use HDSSolutions\Laravel\AppSyncEvents\Broadcasting\AppSyncBroadcaster;
 use HDSSolutions\Laravel\AppSyncEvents\Exceptions\ConfigurationException;
+use HDSSolutions\Laravel\AppSyncEvents\Http\ClientConfigController;
 use HDSSolutions\Laravel\AppSyncEvents\Lambda\AppSyncAuthorizer;
 use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Foundation\CachesRoutes;
+use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -43,6 +47,11 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/appsync-events.php' => config_path('appsync-events.php'),
         ], ['appsync-events-config', 'config']);
+
+        $this->app->booted(function (): void {
+            $this->registerAuthRoute();
+            $this->registerClientConfigRoute();
+        });
     }
 
     /**
@@ -87,6 +96,84 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
                 fn (Container $app, array $connection): AppSyncBroadcaster => $this->createBroadcaster($app, $connection),
             ),
         );
+    }
+
+    /**
+     * Register the broadcasting authentication endpoint.
+     *
+     * Deferred to `Application::booted()` so routes registered by
+     * application providers during their own `boot()` are already in
+     * place. The route is registered through `Broadcast::routes()` —
+     * Laravel's own mechanism (`BroadcastManager::routes`), which adds
+     * GET and POST `/broadcasting/auth` without a route name and strips
+     * CSRF protection. To never shadow an application-defined endpoint
+     * we skip registration when:
+     *  - `appsync-events.routes.auth.enabled` is false;
+     *  - routes are cached (`BroadcastManager::routes` would no-op anyway);
+     *  - a route named `broadcasting.auth` already exists;
+     *  - any route already claims the `/broadcasting/auth` URI —
+     *    applications may register `Broadcast::routes()` with custom
+     *    middleware, and that definition must win.
+     *
+     * Should the application register `Broadcast::routes()` even later
+     * (e.g. from its own `booted()` callback), Laravel's route collection
+     * keys compiled routes by method+URI, so the later registration
+     * replaces ours at match time — the application's endpoint still
+     * wins either ordering.
+     */
+    private function registerAuthRoute(): void
+    {
+        $config = $this->app->make(ConfigRepository::class);
+
+        if (! $config->get('appsync-events.routes.auth.enabled', true)) {
+            return;
+        }
+
+        if ($this->app instanceof CachesRoutes && $this->app->routesAreCached()) {
+            return;
+        }
+
+        if (Route::has('broadcasting.auth')) {
+            return;
+        }
+
+        foreach ($this->app->make('router')->getRoutes()->getRoutes() as $route) {
+            /** @var \Illuminate\Routing\Route $route */
+            if ($route->uri() === 'broadcasting/auth') {
+                return;
+            }
+        }
+
+        Broadcast::routes([
+            'middleware' => $config->get('appsync-events.routes.auth.middleware', ['web']),
+        ]);
+    }
+
+    /**
+     * Register the opt-in client configuration endpoint.
+     *
+     * Disabled by default (`appsync-events.routes.client_config.enabled`);
+     * when enabled it exposes `GET {uri}` under the configured middleware,
+     * returning the {@see AppSyncEventsManager::clientConfig()} payload.
+     */
+    private function registerClientConfigRoute(): void
+    {
+        $config = $this->app->make(ConfigRepository::class);
+
+        if (! $config->get('appsync-events.routes.client_config.enabled', false)) {
+            return;
+        }
+
+        if ($this->app instanceof CachesRoutes && $this->app->routesAreCached()) {
+            return;
+        }
+
+        Route::middleware((array) $config->get('appsync-events.routes.client_config.middleware', ['web', 'auth']))
+            ->get(
+                (string) $config->get('appsync-events.routes.client_config.uri', 'broadcasting/appsync'),
+                ClientConfigController::class,
+            )
+            ->name('appsync-events.client-config');
     }
 
     /**
