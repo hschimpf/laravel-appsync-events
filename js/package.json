@@ -1,0 +1,66 @@
+{
+    "name": "@hds-solutions/laravel-echo-appsync",
+    "version": "0.0.0",
+    "description": "Laravel Echo connector for AWS AppSync Events",
+    "license": "MIT",
+    "type": "module",
+    "keywords": [
+        "laravel",
+        "laravel-echo",
+        "aws",
+        "appsync",
+        "appsync-events",
+        "websockets",
+        "broadcasting"
+    ],
+    "author": {
+        "name": "Hermann D. Schimpf",
+        "email": "hschimpf@hds-solutions.net"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/hschimpf/laravel-appsync-events.git",
+        "directory": "js"
+    },
+    "bugs": "https://github.com/hschimpf/laravel-appsync-events/issues",
+    "homepage": "https://github.com/hschimpf/laravel-appsync-events/tree/main/js",
+    "engines": {
+        "node": ">=22"
+    },
+    "exports": {
+        ".": {
+            "import": {
+                "types": "./dist/index.d.ts",
+                "default": "./dist/index.js"
+            },
+            "require": {
+                "types": "./dist/index.d.cts",
+                "default": "./dist/index.cjs"
+            }
+        }
+    },
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    },
+    "scripts": {
+        "build": "tsup",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "peerDependencies": {
+        "laravel-echo": "^2.0.0"
+    },
+    "devDependencies": {
+        "laravel-echo": "^2.6.3",
+        "tsup": "^9.0.0",
+        "typescript": "^6.0.3",
+        "vitest": "^5.1.0"
+    }
+}
