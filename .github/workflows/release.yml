@@ -3,8 +3,12 @@
 # No Packagist job is needed: once the package is registered on Packagist,
 # the Packagist GitHub integration publishes new tags automatically.
 #
-# Required repository secret: NPM_TOKEN (npm automation token with publish
-# rights on the @hds-solutions scope).
+# npm is published via trusted publishing (OIDC) — no long-lived token.
+# The trusted publisher on npmjs.com must point at this repository and
+# this workflow file (release.yml), with no environment. The package must
+# already exist on npm (publish the very first version manually, see
+# CONTRIBUTING.md); the job below skips versions that are already
+# published, so re-running a tag is safe.
 
 name: Release
 
@@ -56,29 +60,57 @@ jobs:
         needs: tests
         permissions:
             contents: read
-            id-token: write # npm provenance attestation
+            id-token: write # npm trusted publishing (OIDC) + provenance
         runs-on: ubuntu-latest
         defaults:
             run:
                 working-directory: js
         steps:
             - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            # setup-node v5: `package-manager-cache` is not an input on v4;
+            # disabling it prevents caching the global npm CLI itself.
+            - uses: actions/setup-node@v5
               with:
                   node-version: 24
                   registry-url: https://registry.npmjs.org
+                  package-manager-cache: false
                   cache: npm
                   cache-dependency-path: js/package-lock.json
-            - run: npm ci
-            - run: npm run build
+            - name: Check whether the version is already published
+              id: published
+              run: |
+                  name="$(node -p "require('./package.json').name")"
+                  version="$(node -p "require('./package.json').version")"
+                  if npm view "${name}@${version}" version > /dev/null 2>&1; then
+                      echo "::notice::${name}@${version} already exists on npm; skipping build and publish."
+                      echo "already_published=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "already_published=false" >> "$GITHUB_OUTPUT"
+                  fi
+            - name: Ensure npm >= 11.5.1 for trusted publishing
+              if: steps.published.outputs.already_published != 'true'
+              run: |
+                  # Trusted publishing requires npm >= 11.5.1; upgrade if the
+                  # Node 24 bundled npm is older, then enforce the minimum.
+                  is_supported='const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&b>5)||(a===11&&b===5&&c>=1)?0:1)'
+                  node -e "$is_supported" "$(npm -v)" || npm install -g "npm@^11.5.1"
+                  if ! node -e "$is_supported" "$(npm -v)"; then
+                      echo "::error::npm $(npm -v) is below 11.5.1, the minimum required for trusted publishing."
+                      exit 1
+                  fi
+                  echo "npm $(npm -v) satisfies the trusted publishing minimum."
+            - name: Install dependencies
+              if: steps.published.outputs.already_published != 'true'
+              run: npm ci
+            - name: Build
+              if: steps.published.outputs.already_published != 'true'
+              run: npm run build
             - name: Publish (dry run)
-              if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+              if: ${{ steps.published.outputs.already_published != 'true' && github.event_name == 'workflow_dispatch' && inputs.dry_run }}
               run: npm publish --dry-run --access public
             - name: Publish to npm
-              if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
-              env:
-                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-              run: npm publish --provenance --access public
+              if: ${{ steps.published.outputs.already_published != 'true' && (github.event_name != 'workflow_dispatch' || !inputs.dry_run) }}
+              run: npm publish --access public
 
     github-release:
         name: GitHub release
