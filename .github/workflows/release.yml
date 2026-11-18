@@ -67,15 +67,13 @@ jobs:
                 working-directory: js
         steps:
             - uses: actions/checkout@v4
-            # setup-node v5: `package-manager-cache` is not an input on v4;
-            # disabling it prevents caching the global npm CLI itself.
+            # setup-node v5: `package-manager-cache` is not an input on v4.
+            # Release builds never use caches (npm trusted publishing docs).
             - uses: actions/setup-node@v5
               with:
                   node-version: 24
                   registry-url: https://registry.npmjs.org
                   package-manager-cache: false
-                  cache: npm
-                  cache-dependency-path: js/package-lock.json
             - name: Check whether the version is already published
               id: published
               run: |
