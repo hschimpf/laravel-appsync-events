@@ -53,6 +53,7 @@
     "scripts": {
         "build": "tsup",
         "test": "vitest run",
+        "test:emulator": "vitest run --config vitest.emulator.config.ts",
         "test:package": "npm run build && node scripts/smoke.mjs && node scripts/smoke.cjs",
         "typecheck": "tsc --noEmit"
     },
@@ -60,6 +61,8 @@
         "laravel-echo": "^2.0.0"
     },
     "devDependencies": {
+        "@aws-sdk/client-appsync": "3.1166.0",
+        "@smithy/node-http-handler": "4.14.2",
         "@types/node": "^26.6.6",
         "laravel-echo": "^2.6.3",
         "tsup": "^9.0.0",
