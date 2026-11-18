@@ -7,7 +7,7 @@ package's AppSync Events code paths can be exercised without an AWS account.
 
 ```bash
 tests/emulator/start.sh   # builds the image if needed, starts the container,
-                          # waits on /__admin/health, prints the env vars to export
+                          # waits on /__admin/health, writes .runtime/<port>/emulator.json
 tests/emulator/stop.sh    # stops the container
 ```
 
@@ -18,9 +18,89 @@ Environment overrides:
 - `EMULATOR_LISTENER_PORT_RANGE` — port range for the per-API data-plane
   sockets (default `9400-9419`).
 
-Generated credentials and the CA certificate land in
-`tests/emulator/.runtime/<port>/` (git-ignored). The container is ephemeral
-(`--rm`, `--idle-timeout 3600`); all state is in memory and lost on stop.
+Generated credentials, the CA certificate and a machine-readable
+`emulator.json` land in `tests/emulator/.runtime/<port>/` (git-ignored). The
+container is ephemeral (`--rm`, `--idle-timeout 3600`); all state is in
+memory and lost on stop.
+
+## Running the emulator test suites
+
+```bash
+tests/emulator/start.sh
+
+composer test:emulator                 # builds js/ first (the PHP suite
+                                       # spawns Node subscribers that
+                                       # import js/dist/index.js), then
+                                       # pest --testsuite=Emulator --group=emulator
+npm --prefix js run test:emulator      # vitest against the real realtime socket
+
+tests/emulator/stop.sh
+```
+
+### How tests find the emulator
+
+Both harnesses resolve the emulator with the same precedence:
+
+1. Env vars `EMULATOR_ENDPOINT`, `EMULATOR_CA_BUNDLE`,
+   `EMULATOR_ACCESS_KEY_ID`, `EMULATOR_SECRET_ACCESS_KEY`, `EMULATOR_REGION`
+   (all five required).
+2. `tests/emulator/.runtime/${EMULATOR_PORT:-9297}/emulator.json`.
+
+When no config exists or the health check (`GET /__admin/health` with the CA
+bundle) fails, emulator tests are **skipped** with a pointer to this file.
+Setting `EMULATOR_REQUIRED=1` turns skips into failures (CI uses this).
+
+### What the suites verify — and what they don't
+
+Verified end-to-end:
+
+- `AppSyncBroadcaster::broadcast()` publishes through the real HTTP publish
+  endpoint and events arrive at a real Node process running the built
+  `AppSyncConnector` (public API-key and private token channels, channel
+  isolation, notification-style event names).
+- The connector talks to the real realtime socket: `header-*` subprotocol
+  handshake, subscribe/`subscribe_success`, `subscribe_error` for unknown
+  namespaces, `leave()`, `disconnect()`/`connect()` resubscription, and
+  reconnect behaviour on a refused upgrade.
+- Failure surfacing: unknown namespace → `BroadcastException` (404),
+  unreachable endpoint → `BroadcastException`.
+
+**Not** verified by the emulator (covered by unit tests instead):
+
+- SigV4 signature correctness — the data plane only checks *which* auth
+  mechanism was presented, not that the signature is valid.
+- Lambda authorizer invocation — the emulator never calls the configured
+  `AWS_LAMBDA` provider; `AppSyncAuthorizer` is exercised in a contract
+  test only (a broadcaster-issued subscribe token is verified for exactly
+  its channel path).
+- Token validity — the emulator accepts any presented token, so the JS
+  tests use arbitrary subscribe tokens via the connector's `authorizer`
+  option. `TokenSigner` correctness is unit-tested.
+
+### Known emulator issues and how the tests avoid them
+
+- [#453](https://github.com/aws/aws-emulator/issues/453) — a
+  client-initiated WebSocket close receives no server Close frame, so the
+  socket reports code `1006`/unclean. The connector is unaffected:
+  `disconnect()` sets its closing flag before `close()`, so the resulting
+  close/error events cannot trigger a spurious reconnect (covered by the
+  JS "disconnect cancels pending reconnects" tests).
+- [#357](https://github.com/aws/aws-emulator/issues/357) —
+  `ListTagsForResource` rejects channel-namespace ARNs. Irrelevant here:
+  the suites never tag or list tags.
+- Data-plane listeners bind OS-ephemeral ports unless
+  `EMULATOR_LISTENER_PORT_RANGE` is set; `start.sh` pins `9400-9419` so
+  Docker publishes them deterministically (see "Port allocation" below).
+- `dns.HTTP`/`dns.REALTIME` are `host:port` authorities without a scheme;
+  both harnesses build `http://…/event` and `ws://…/event/realtime`
+  explicitly.
+- `CreateApi` accepts an `AWS_LAMBDA` `authProvider` with a dummy
+  `authorizerUri` (verified), so the provisioned API mirrors the
+  production auth shape.
+- The PHP wrapper on this machine scrubs non-allowlisted environment
+  variables (`EMULATOR_*` never reach `getenv()`/`$_SERVER`/`$_ENV`) —
+  the `emulator.json` fallback makes this moot locally; env vars work
+  under a stock PHP/CI runtime.
 
 ## Emulator behaviour notes
 
