@@ -45,6 +45,7 @@
     "files": [
         "dist"
     ],
+    "sideEffects": false,
     "publishConfig": {
         "access": "public",
         "provenance": true
@@ -52,6 +53,7 @@
     "scripts": {
         "build": "tsup",
         "test": "vitest run",
+        "test:package": "npm run build && node scripts/smoke.mjs && node scripts/smoke.cjs",
         "typecheck": "tsc --noEmit"
     },
     "peerDependencies": {
