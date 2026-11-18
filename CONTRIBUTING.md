@@ -94,33 +94,63 @@ Steps:
    `git tag -s vX.Y.Z -m "vX.Y.Z"`, push the commit and the tag.
 4. The release workflow verifies the tag matches `js/package.json`
    (fails otherwise), runs the full CI workflow, publishes
-   `@hds-solutions/laravel-echo-appsync` with `--provenance`, and creates
-   the GitHub release with the changelog section as notes.
+   `@hds-solutions/laravel-echo-appsync` via npm trusted publishing
+   (OIDC — no token is used and provenance is issued automatically),
+   and creates the GitHub release with the changelog section as notes.
+   If the version already exists on npm the publish job skips it with a
+   notice, so re-running a tag is safe.
 
 Rehearse with **Actions → Release → Run workflow** (`dry_run: true`):
 it runs verification, the test suite and `npm publish --dry-run` without
-publishing or creating a release.
+publishing or creating a release (no OIDC is needed for a dry run).
 
 Prerequisites to configure once:
 
-- `NPM_TOKEN` repository secret — an npm **automation** token with publish
-  rights on the `@hds-solutions` scope (or switch to npm trusted
-  publishing and drop the token).
-- npm provenance (`--provenance`) requires a **public** repository; the
-  workflow grants `id-token: write` for the attestation.
+- **npm trusted publishing** for `@hds-solutions/laravel-echo-appsync`
+  on npmjs.com: GitHub provider, owner `hschimpf`, repository
+  `laravel-appsync-events`, workflow file `release.yml`, **no
+  environment**. Configure it under the package's *Settings →
+  Publishing access*, or from the CLI (npm >= 11.15, 2FA-enabled
+  account):
+
+  ```bash
+  npm trust github @hds-solutions/laravel-echo-appsync --file release.yml --repo hschimpf/laravel-appsync-events --allow-publish
+  ```
+- Under *Publishing access*, choose **"Require two-factor
+  authentication and disallow tokens"** so that only OIDC publishes
+  succeed.
+- The package must exist on npm before the first OIDC publish — see the
+  bootstrap below. The first trusted publish is additionally subject to
+  npm's validation window of up to two days.
+- Trusted publishing requires a **public** repository; the workflow
+  grants `id-token: write` to the publish job for the OIDC token.
 - The Packagist package must be registered with the GitHub webhook/app
   enabled so tags publish to Packagist automatically.
 
-### Manual publish fallback
+### First publish (one-time bootstrap)
 
-`js/package.json` sets `publishConfig.provenance: true`, and provenance
-can only be issued inside a supported CI OIDC environment. A **real**
-manual `npm publish` therefore fails outside GitHub Actions (`--dry-run`
-still works — it performs no attestation). If a manual publish is ever
-needed, disable provenance for that run:
+A trusted publisher can only be attached to a package that already
+exists on npm, so the very first version is published by hand once from
+`js/` with an npm account that owns the `@hds-solutions` scope
+(2FA/OTP required):
 
 ```bash
+npm ci && npm run build
 npm publish --access public --provenance=false
 ```
 
-Prefer the release workflow — it is the documented, attested path.
+`--provenance=false` is needed because `js/package.json` sets
+`publishConfig.provenance: true`, and provenance can only be issued
+inside a supported CI OIDC environment (a local `npm publish --dry-run`
+still works — it performs no attestation). Configure the trusted
+publisher right after; every release from then on goes through the
+workflow.
+
+### Troubleshooting
+
+- `E404` on an OIDC publish — the trusted publisher is not configured
+  for the package, or the configured repository/workflow file does not
+  match `hschimpf/laravel-appsync-events` + `release.yml`.
+- "Cannot publish over a previously published version" — the version in
+  `js/package.json` already exists on npm; the workflow detects this
+  and skips the publish, but a manual publish still fails.
