@@ -31,7 +31,7 @@ jobs:
         name: Verify version
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - uses: shivammathur/setup-php@v2
               with:
                   php-version: '8.4'
@@ -66,10 +66,9 @@ jobs:
             run:
                 working-directory: js
         steps:
-            - uses: actions/checkout@v4
-            # setup-node v5: `package-manager-cache` is not an input on v4.
+            - uses: actions/checkout@v7
             # Release builds never use caches (npm trusted publishing docs).
-            - uses: actions/setup-node@v5
+            - uses: actions/setup-node@v7
               with:
                   node-version: 24
                   registry-url: https://registry.npmjs.org
@@ -117,7 +116,7 @@ jobs:
             contents: write
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
             - name: Extract release notes
               run: node scripts/release-notes.mjs "$GITHUB_REF_NAME" CHANGELOG.md > release-notes.md
             - name: Create GitHub release
