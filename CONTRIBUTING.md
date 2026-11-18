@@ -76,3 +76,37 @@ only — the tests pick it up automatically.
 - [ ] PHPDoc/TSDoc on new public API; README/CHANGELOG updated when
       user-facing behavior changes.
 - [ ] Conventional Commit messages; no unrelated churn in the diff.
+
+## Releasing
+
+Both packages are released in lockstep as `vX.Y.Z` tags. The Composer
+package needs no release job — Packagist publishes tags automatically once
+the package is registered; the npm package is published by
+`.github/workflows/release.yml` on tag push.
+
+Steps:
+
+1. Bump the npm version (kept in `js/package.json` only):
+   `npm --prefix js version X.Y.Z --no-git-tag-version`
+2. Move the `CHANGELOG.md` `[Unreleased]` entries under a new
+   `## [X.Y.Z] - YYYY-MM-DD` heading.
+3. Commit (`chore(release): vX.Y.Z`), create a **signed** tag:
+   `git tag -s vX.Y.Z -m "vX.Y.Z"`, push the commit and the tag.
+4. The release workflow verifies the tag matches `js/package.json`
+   (fails otherwise), runs the full CI workflow, publishes
+   `@hds-solutions/laravel-echo-appsync` with `--provenance`, and creates
+   the GitHub release with the changelog section as notes.
+
+Rehearse with **Actions → Release → Run workflow** (`dry_run: true`):
+it runs verification, the test suite and `npm publish --dry-run` without
+publishing or creating a release.
+
+Prerequisites to configure once:
+
+- `NPM_TOKEN` repository secret — an npm **automation** token with publish
+  rights on the `@hds-solutions` scope (or switch to npm trusted
+  publishing and drop the token).
+- npm provenance (`--provenance`) requires a **public** repository; the
+  workflow grants `id-token: write` for the attestation.
+- The Packagist package must be registered with the GitHub webhook/app
+  enabled so tags publish to Packagist automatically.
