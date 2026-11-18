@@ -95,6 +95,11 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
      * `region`, `default_namespace` and the HTTP timeout settings. A
      * dedicated TokenSigner is built from the effective secret so
      * per-connection secrets are honoured.
+     *
+     * The factory is a first-class callable on purpose: since Laravel 13
+     * `BroadcastManager::extend()` binds anonymous creator closures to
+     * the manager instance (both `$this` and scope), which would break
+     * calls to this provider's private methods.
      */
     private function registerBroadcastDriver(): void
     {
@@ -102,7 +107,7 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
             BroadcastFactory::class,
             fn (BroadcastFactory $broadcast) => $broadcast->extend(
                 'appsync',
-                fn (Container $app, array $connection): AppSyncBroadcaster => $this->createBroadcaster($app, $connection),
+                $this->createBroadcaster(...),
             ),
         );
     }
