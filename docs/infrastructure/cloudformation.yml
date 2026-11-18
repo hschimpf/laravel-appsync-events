@@ -1,0 +1,145 @@
+# CloudFormation template: AppSync Event API for hds-solutions/laravel-appsync-events
+#
+# Deploy with:
+#   aws cloudformation deploy \
+#       --template-file cloudformation.yml \
+#       --stack-name my-app-events \
+#       --parameter-overrides \
+#           ApiName=my-app-events \
+#           AuthorizerFunctionArn=arn:aws:lambda:us-east-1:123456789012:function:my-authorizer \
+#           PublisherRoleName=my-app-server-role
+#
+# Validated with: cfn-lint 1.60.1 (resource/property names + intrinsic functions).
+# NOT validated against a live AWS account.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+    AppSync Event API, channel namespaces, Lambda authorizer permission and
+    publish policy for the laravel-appsync-events broadcasting driver.
+
+Parameters:
+    ApiName:
+        Type: String
+        Description: Name of the Event API.
+        AllowedPattern: '^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?$'
+
+    AuthorizerFunctionArn:
+        Type: String
+        Description: >-
+            ARN of the Lambda function running the AppSyncEvents authorizer
+            (see docs/aws-setup.md). The function is expected to exist.
+        AllowedPattern: '^arn:aws:lambda:[a-z0-9-]+:\d{12}:function:.+$'
+
+    AuthorizerResultTtl:
+        Type: Number
+        Description: >-
+            Seconds AppSync caches authorizer results (the authorizer's
+            ttlOverride applies per connection).
+        Default: 300
+        MinValue: 0
+        MaxValue: 3600
+
+    PublicChannels:
+        Type: String
+        Description: >-
+            Whether anonymous/API-key access for PUBLIC channels is enabled.
+            When 'false', only token-authenticated (Lambda) connects and
+            subscribes are allowed.
+        AllowedValues: ['true', 'false']
+        Default: 'false'
+
+    PublisherRoleName:
+        Type: String
+        Description: >-
+            Optional IAM role name to attach the publish policy to (the role
+            your Laravel servers/tasks run as). Leave empty to only output
+            the policy ARN for manual attachment.
+        Default: ''
+
+Conditions:
+    EnableApiKey: !Equals [!Ref PublicChannels, 'true']
+    HasPublisherRole: !Not [!Equals [!Ref PublisherRoleName, '']]
+
+Resources:
+    EventApi:
+        Type: AWS::AppSync::Api
+        Properties:
+            Name: !Ref ApiName
+            EventConfig:
+                AuthProviders:
+                    - AuthType: AWS_LAMBDA
+                      LambdaAuthorizerConfig:
+                          AuthorizerUri: !Ref AuthorizerFunctionArn
+                          AuthorizerResultTtlInSeconds: !Ref AuthorizerResultTtl
+                    - AuthType: AWS_IAM
+                    - !If
+                        - EnableApiKey
+                        - AuthType: API_KEY
+                        - !Ref AWS::NoValue
+                ConnectionAuthModes:
+                    - AuthType: AWS_LAMBDA
+                    - !If
+                        - EnableApiKey
+                        - AuthType: API_KEY
+                        - !Ref AWS::NoValue
+                DefaultPublishAuthModes:
+                    - AuthType: AWS_IAM
+                DefaultSubscribeAuthModes:
+                    - AuthType: AWS_LAMBDA
+                    - !If
+                        - EnableApiKey
+                        - AuthType: API_KEY
+                        - !Ref AWS::NoValue
+
+    # One AWS::AppSync::ChannelNamespace resource per AppSync namespace used
+    # by your channel names: the first dot-segment of a Laravel channel name
+    # becomes the namespace (`orders.1` -> /orders/…), and dotless names use
+    # the configured `default_namespace` (default: `default`).
+    DefaultNamespace:
+        Type: AWS::AppSync::ChannelNamespace
+        Properties:
+            ApiId: !GetAtt EventApi.ApiId
+            Name: default
+
+    OrdersNamespace:
+        Type: AWS::AppSync::ChannelNamespace
+        Properties:
+            ApiId: !GetAtt EventApi.ApiId
+            Name: orders
+
+    AuthorizerInvokePermission:
+        Type: AWS::Lambda::Permission
+        Properties:
+            Action: lambda:InvokeFunction
+            FunctionName: !Ref AuthorizerFunctionArn
+            Principal: appsync.amazonaws.com
+            SourceArn: !GetAtt EventApi.ApiArn
+            SourceAccount: !Ref AWS::AccountId
+
+    PublishPolicy:
+        Type: AWS::IAM::ManagedPolicy
+        Properties:
+            Description: >-
+                Allows publishing events to this API's channel namespaces via
+                the AppSync HTTP /event endpoint (IAM/SigV4).
+            Roles: !If [HasPublisherRole, [!Ref PublisherRoleName], !Ref AWS::NoValue]
+            PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                    - Effect: Allow
+                      Action: appsync:EventPublish
+                      Resource:
+                          - !Sub 'arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${EventApi.ApiId}/channelNamespace/*'
+
+Outputs:
+    ApiId:
+        Value: !GetAtt EventApi.ApiId
+    ApiArn:
+        Value: !GetAtt EventApi.ApiArn
+    HttpEndpoint:
+        Description: Value for APPSYNC_HTTP_ENDPOINT.
+        Value: !Sub 'https://${EventApi.Dns.Http}/event'
+    RealtimeEndpoint:
+        Description: Value for APPSYNC_REALTIME_ENDPOINT.
+        Value: !Sub 'wss://${EventApi.Dns.Realtime}/event/realtime'
+    PublishPolicyArn:
+        Value: !Ref PublishPolicy

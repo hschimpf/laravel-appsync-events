@@ -1,0 +1,88 @@
+# Serverless Framework fragment: AppSync Event API + authorizer function
+#
+# Merge the relevant sections into your own serverless.yml. Assumes a
+# Lambda function named `authorizer` defined below; the generated logical
+# resource id is `AuthorizerLambdaFunction`.
+#
+# Validated: YAML syntax + Serverless Framework resource conventions.
+# NOT validated with `serverless deploy` or against a live AWS account.
+
+service: my-app
+
+provider:
+    name: aws
+    # runtime is set per function for PHP runtimes; default for others.
+    region: ${opt:region, 'us-east-1'}
+
+functions:
+    authorizer:
+        # Plain PHP handler: App\Lambda\AppsyncEventsAuthorizer::handle
+        # (see "Lambda authorizer" in the README).
+        handler: App\Lambda\AppsyncEventsAuthorizer.handle
+        # If you deploy with Bref (https://bref.sh), use instead:
+        #   runtime: php-82
+        #   handler: App\Lambda\AppsyncEventsAuthorizer  # class implementing Bref\Event\Handler
+        #   plugins: [./vendor/bref/bref]
+        environment:
+            APPSYNC_CHANNEL_SIGNING_SECRET: ${ssm:/my-app/appsync-signing-secret}
+            # The authorizer must never broadcast itself (see README):
+            BROADCAST_CONNECTION: log
+            APPSYNC_HTTP_ENDPOINT: ''
+            APPSYNC_REALTIME_ENDPOINT: ''
+
+resources:
+    Resources:
+        AppSyncEventApi:
+            Type: AWS::AppSync::Api
+            Properties:
+                Name: ${self:service}-${sls:stage}-events
+                EventConfig:
+                    AuthProviders:
+                        - AuthType: AWS_LAMBDA
+                          LambdaAuthorizerConfig:
+                              AuthorizerUri: !GetAtt AuthorizerLambdaFunction.Arn
+                              AuthorizerResultTtlInSeconds: 300
+                        - AuthType: AWS_IAM
+                        # Remove API_KEY entries below if you don't need public channels.
+                        - AuthType: API_KEY
+                    ConnectionAuthModes:
+                        - AuthType: AWS_LAMBDA
+                        - AuthType: API_KEY
+                    DefaultPublishAuthModes:
+                        - AuthType: AWS_IAM
+                    DefaultSubscribeAuthModes:
+                        - AuthType: AWS_LAMBDA
+                        - AuthType: API_KEY
+
+        # Add one channel namespace per dot-prefix your channel names use
+        # (`orders.1` -> `orders`), plus `default` for dotless names.
+        DefaultChannelNamespace:
+            Type: AWS::AppSync::ChannelNamespace
+            Properties:
+                ApiId: !GetAtt AppSyncEventApi.ApiId
+                Name: default
+
+        OrdersChannelNamespace:
+            Type: AWS::AppSync::ChannelNamespace
+            Properties:
+                ApiId: !GetAtt AppSyncEventApi.ApiId
+                Name: orders
+
+        AuthorizerInvokePermission:
+            Type: AWS::Lambda::Permission
+            Properties:
+                Action: lambda:InvokeFunction
+                FunctionName: !GetAtt AuthorizerLambdaFunction.Arn
+                Principal: appsync.amazonaws.com
+                SourceArn: !GetAtt AppSyncEventApi.ApiArn
+
+        # Give your application role `appsync:EventPublish` on every namespace:
+        #   arn:aws:appsync:<region>:<account>:apis/<api-id>/channelNamespace/<name>
+        # (attach a managed policy to the role your servers run as — see
+        # cloudformation.yml for a reusable policy shape).
+
+    Outputs:
+        AppSyncHttpEndpoint:
+            Value: !Sub 'https://${AppSyncEventApi.Dns.Http}/event'
+        AppSyncRealtimeEndpoint:
+            Value: !Sub 'wss://${AppSyncEventApi.Dns.Realtime}/event/realtime'
