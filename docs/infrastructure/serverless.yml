@@ -4,8 +4,10 @@
 # Lambda function named `authorizer` defined below; the generated logical
 # resource id is `AuthorizerLambdaFunction`.
 #
-# Validated: YAML syntax + Serverless Framework resource conventions.
-# NOT validated with `serverless deploy` or against a live AWS account.
+# Validated: YAML syntax. NOT validated with cfn-lint (Serverless-specific
+# top-level keys are not CloudFormation) — the `resources.Resources` block
+# mirrors the lint-clean cloudformation.yml shapes — nor with
+# `serverless deploy` / a live AWS account.
 
 service: my-app
 
