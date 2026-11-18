@@ -67,8 +67,14 @@ test('falls back for an empty section', () => {
 
 test('extracts from the real repository changelog', () => {
     const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
-    const notes = extractReleaseNotes(changelog, 'Unreleased');
+    const notes = extractReleaseNotes(changelog, '0.1.0');
 
     assert.match(notes, /broadcasting driver/i);
     assert.doesNotMatch(notes, /^## /m);
+});
+
+test('an empty Unreleased section falls back', () => {
+    const changelog = readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+
+    assert.match(extractReleaseNotes(changelog, 'Unreleased'), /CHANGELOG\.md/);
 });
