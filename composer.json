@@ -12,6 +12,11 @@
         "websockets",
         "laravel-echo"
     ],
+    "homepage": "https://github.com/hschimpf/laravel-appsync-events",
+    "support": {
+        "issues": "https://github.com/hschimpf/laravel-appsync-events/issues",
+        "source": "https://github.com/hschimpf/laravel-appsync-events"
+    },
     "authors": [
         {
             "name": "Hermann D. Schimpf",
