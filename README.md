@@ -430,14 +430,6 @@ Emulator tests, fixture conventions and the PR checklist live in [CONTRIBUTING.m
 
 Roadmap: presence-channel emulation, `clientConfig()` token-refresh endpoint variants, first-party JS framework adapters.
 
-## Migrating from `georgeboot/laravel-echo-api-gateway`
-
-1. `composer remove georgeboot/laravel-echo-api-gateway`; install this package and `@hds-solutions/laravel-echo-appsync`.
-2. Provision an **Event API** (these are not API Gateway WebSocket APIs) plus the Lambda authorizer and namespaces — [docs/aws-setup.md](docs/aws-setup.md).
-3. Replace `BROADCAST_CONNECTION=api-gateway` with `appsync` and set the `APPSYNC_*` env vars.
-4. Swap the frontend connector for `appSyncEchoOptions({ wsEndpoint, connectToken })` — `echo.private()`/`listen()` calls are unchanged.
-5. Channel authorization keeps working through `/broadcasting/auth`; the subscribe token replaces any bespoke handshake auth.
-
 ## Versioning and license
 
 Both packages follow SemVer and release in lockstep (`0.x` while the API surface stabilizes). MIT — see [LICENSE](LICENSE). Built by [Hermann D. Schimpf](https://hds-solutions.net).
