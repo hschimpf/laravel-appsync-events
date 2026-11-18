@@ -16,7 +16,13 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->mergeConfigFrom(__DIR__.'/../config/appsync-events.php', 'appsync-events');
+
+        $config = $this->app['config'];
+
+        if ($config->get('broadcasting.connections.appsync') === null) {
+            $config->set('broadcasting.connections.appsync', ['driver' => 'appsync']);
+        }
     }
 
     /**
