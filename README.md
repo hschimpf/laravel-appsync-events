@@ -26,18 +26,18 @@ The community package [`7amoood/laravel-appsync-broadcaster`](https://github.com
 ```mermaid
 flowchart LR
     subgraph Laravel
-        E[Event<br/>ShouldBroadcast] --> B[AppSyncBroadcaster<br/>SigV4 signer]
-        R[/broadcasting/auth] --> TS[TokenSigner<br/>HMAC secret]
+        E["Event (ShouldBroadcast)"] --> B["AppSyncBroadcaster (SigV4)"]
+        R["/broadcasting/auth"] --> TS["TokenSigner (HMAC secret)"]
     end
     subgraph AWS
-        B -- "POST /event<br/>(IAM)" --> A[AppSync<br/>Event API]
-        A -- "EVENT_CONNECT /<br/>EVENT_SUBSCRIBE" --> L[Lambda<br/>authorizer]
-        L -. verifies .- TS
-        A -- WebSocket --> C[Echo connector<br/>@hds-solutions/laravel-echo-appsync]
+        B -- "POST /event (IAM)" --> A["AppSync Event API"]
+        A -- "EVENT_CONNECT / EVENT_SUBSCRIBE" --> L["Lambda authorizer"]
+        L -. "verifies" .- TS
+        A -- "WebSocket" --> C["Echo connector"]
     end
     C -. "{socket_id, channel_name}" .-> R
     R -. "{auth: subscribeToken}" .-> C
-    TS -. clientConfig:<br/>connectToken .-> C
+    TS -. "clientConfig: connectToken" .-> C
 ```
 
 1. A `ShouldBroadcast` event fires; `AppSyncBroadcaster` SigV4-signs a `POST /event` to the Event API's HTTP endpoint with IAM credentials.
