@@ -61,6 +61,7 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
 });
 
@@ -235,6 +236,69 @@ describe('subscriptions', () => {
         expect(subscribed).not.toHaveBeenCalled();
         socket.serverSend({ type: 'subscribe_success', id: channel.subscriptionId });
         expect(subscribed).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls the default global fetch without an illegal receiver', async () => {
+        // Browsers require fetch's receiver to be Window/undefined — a
+        // detached call like `options.fetch(...)` throws "Illegal
+        // invocation" before any request is sent. Node's fetch has no
+        // brand check, so simulate the browser behaviour explicitly.
+        const brandCheckedFetch = vi.fn(function (this: unknown, _input: RequestInfo | URL, _init?: RequestInit): Promise<Response> {
+            if (this !== undefined && this !== globalThis) {
+                throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+            }
+
+            return Promise.resolve(jsonResponse({ auth: 'subscribe-token' }));
+        });
+        vi.stubGlobal('fetch', brandCheckedFetch);
+
+        const connector = new AppSyncConnector({
+            broadcaster: AppSyncConnector,
+            wsEndpoint: WS_ENDPOINT,
+            connectToken: 'connect-token',
+            WebSocket: FakeWebSocket,
+        });
+        const socket = await connectAndAck(connector);
+
+        const channel = connector.privateChannel('orders.1');
+        await tick();
+
+        expect(brandCheckedFetch).toHaveBeenCalledWith(
+            '/broadcasting/auth',
+            expect.objectContaining({ method: 'POST' }),
+        );
+
+        const subscribe = socket.sentFrames.find((frame) => frame.type === 'subscribe');
+        expect(subscribe).toMatchObject({
+            id: channel.subscriptionId,
+            channel: '/orders/private/1',
+            authorization: { host: HTTP_HOST, Authorization: 'subscribe-token' },
+        });
+    });
+
+    it('invokes a custom fetch without the options object as receiver', async () => {
+        let receiver: unknown = Symbol('unset');
+        const fetchMock = vi.fn(function (this: unknown): Promise<Response> {
+            receiver = this;
+
+            return Promise.resolve(jsonResponse({ auth: 'subscribe-token' }));
+        });
+
+        const connector = new AppSyncConnector({
+            broadcaster: AppSyncConnector,
+            wsEndpoint: WS_ENDPOINT,
+            connectToken: 'connect-token',
+            WebSocket: FakeWebSocket,
+            fetch: fetchMock,
+        });
+        const socket = await connectAndAck(connector);
+
+        connector.privateChannel('orders.1');
+        await tick();
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(receiver).toBeUndefined();
+        expect(socket.sentFrames.find((frame) => frame.type === 'subscribe')).toBeDefined();
     });
 
     it('honours a custom authEndpoint, headers, credentials and string bearer', async () => {

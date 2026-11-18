@@ -152,7 +152,11 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
         resolved.defaultNamespace ??= 'default';
         resolved.debug ??= false;
         resolved.WebSocket ??= globalThis.WebSocket as unknown as ResolvedAppSyncConnectorOptions['WebSocket'];
-        resolved.fetch ??= globalThis.fetch;
+        // A browser's fetch is a WebIDL operation that throws an "Illegal
+        // invocation" TypeError unless its receiver is Window/undefined,
+        // so it must not be stored as a method call target; the indirection
+        // also resolves the global lazily for runtimes that stub it late.
+        resolved.fetch ??= (input, init) => globalThis.fetch(input, init);
         resolved.reconnect = {
             baseMs: resolved.reconnect?.baseMs ?? 1_000,
             capMs: resolved.reconnect?.capMs ?? 30_000,
@@ -603,7 +607,11 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
         const opts = this.opts;
 
         if (opts.authorizer) {
-            return opts.authorizer(channelName, this.socketId());
+            // Invoke detached: user-supplied functions must not receive
+            // the options object as `this`.
+            const authorizer = opts.authorizer;
+
+            return authorizer(channelName, this.socketId());
         }
 
         const headers: Record<string, string> = {
@@ -627,7 +635,11 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
             request.credentials = opts.credentials;
         }
 
-        const response = await opts.fetch(opts.authEndpoint, request);
+        // Invoke detached: a fetch implementation — the default global
+        // wrapper or a user-supplied one — must not receive the options
+        // object as `this` (browser fetch throws "Illegal invocation").
+        const doFetch = opts.fetch;
+        const response = await doFetch(opts.authEndpoint, request);
 
         if (!response.ok) {
             const error = new Error(`Channel authorization failed with status ${response.status}`) as Error & { status: number };
