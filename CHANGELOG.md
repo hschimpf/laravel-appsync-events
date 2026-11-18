@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-18
+
+### Changed
+
+- **GitHub Actions updated to current majors** — `actions/checkout` v7,
+  `actions/setup-node` v7, `actions/cache` v6, `actions/upload-artifact` v7;
+  `shivammathur/setup-php` stays on the floating `v2` line.
+
+### Removed
+
+- The "Migrating from `georgeboot/laravel-echo-api-gateway`" README section —
+  it documented one consuming app's migration, not the library itself.
+
+### Fixed
+
+- README TypeScript snippets now annotate callback parameters so they compile
+  under `noImplicitAny` (`(e: unknown)`).
+
 ## [0.1.0] - 2026-11-18
 
 ### Added
@@ -44,5 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI** — PHP 8.2–8.5 tests, lint and static analysis; Node 22/24 JS
   typecheck, build and tests.
 
-[Unreleased]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/hschimpf/laravel-appsync-events/releases/tag/v0.1.0

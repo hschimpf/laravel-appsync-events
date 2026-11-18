@@ -1,6 +1,6 @@
 {
     "name": "@hds-solutions/laravel-echo-appsync",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Laravel Echo connector for AWS AppSync Events",
     "license": "MIT",
     "type": "module",
