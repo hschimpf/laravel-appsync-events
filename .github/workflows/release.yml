@@ -1,0 +1,97 @@
+# Release pipeline for tags vX.Y.Z (and manual dry-run rehearsals).
+#
+# No Packagist job is needed: once the package is registered on Packagist,
+# the Packagist GitHub integration publishes new tags automatically.
+#
+# Required repository secret: NPM_TOKEN (npm automation token with publish
+# rights on the @hds-solutions scope).
+
+name: Release
+
+on:
+    push:
+        tags:
+            - 'v[0-9]+.[0-9]+.[0-9]+*'
+    workflow_dispatch:
+        inputs:
+            dry_run:
+                description: 'Rehearse the release without publishing (npm --dry-run, no GitHub release)'
+                type: boolean
+                default: true
+
+permissions:
+    contents: read
+
+jobs:
+    verify:
+        name: Verify version
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+            - run: composer validate --strict
+            - name: Check the tag matches js/package.json
+              if: startsWith(github.ref, 'refs/tags/')
+              run: |
+                  tag="${GITHUB_REF_NAME#v}"
+                  pkg="$(node -p "require('./js/package.json').version")"
+                  if [ "$tag" != "$pkg" ]; then
+                      echo "::error::Tag ${GITHUB_REF_NAME} does not match js/package.json version ${pkg}. Bump it first (npm version <x.y.z> --no-git-tag-version in js/)."
+                      exit 1
+                  fi
+                  echo "Tag ${GITHUB_REF_NAME} matches js/package.json ${pkg}."
+            - name: Extract release notes for the tag
+              run: node scripts/release-notes.mjs "$GITHUB_REF_NAME" CHANGELOG.md > release-notes.md && head -20 release-notes.md
+
+    tests:
+        name: Test suite
+        needs: verify
+        uses: ./.github/workflows/ci.yml
+
+    npm-publish:
+        name: Publish npm package
+        needs: tests
+        permissions:
+            contents: read
+            id-token: write # npm provenance attestation
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: js
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  registry-url: https://registry.npmjs.org
+                  cache: npm
+                  cache-dependency-path: js/package-lock.json
+            - run: npm ci
+            - run: npm run build
+            - name: Publish (dry run)
+              if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+              run: npm publish --dry-run --access public
+            - name: Publish to npm
+              if: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: npm publish --provenance --access public
+
+    github-release:
+        name: GitHub release
+        needs: tests
+        permissions:
+            contents: write
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Extract release notes
+              run: node scripts/release-notes.mjs "$GITHUB_REF_NAME" CHANGELOG.md > release-notes.md
+            - name: Create GitHub release
+              if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: gh release create "$GITHUB_REF_NAME" --notes-file release-notes.md --verify-tag
