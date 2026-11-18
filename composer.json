@@ -1,0 +1,75 @@
+{
+    "name": "hds-solutions/laravel-appsync-events",
+    "description": "AWS AppSync Events broadcasting driver for Laravel, with a Laravel Echo connector",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "aws",
+        "appsync",
+        "appsync-events",
+        "broadcasting",
+        "websockets",
+        "laravel-echo"
+    ],
+    "authors": [
+        {
+            "name": "Hermann D. Schimpf",
+            "email": "hschimpf@hds-solutions.net"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "aws/aws-sdk-php": "^3.325",
+        "guzzlehttp/guzzle": "^7.8|^8.0",
+        "guzzlehttp/psr7": "^2.0|^3.0",
+        "illuminate/broadcasting": "^11.0|^12.0|^13.0",
+        "illuminate/contracts": "^11.0|^12.0|^13.0",
+        "illuminate/http": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.18",
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0|^5.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0|^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "HDSSolutions\\Laravel\\AppSyncEvents\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "HDSSolutions\\Laravel\\AppSyncEvents\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "HDSSolutions\\Laravel\\AppSyncEvents\\AppSyncEventsServiceProvider"
+            ],
+            "aliases": {
+                "AppSyncEvents": "HDSSolutions\\Laravel\\AppSyncEvents\\Facades\\AppSyncEvents"
+            }
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "test:unit": "pest --testsuite=Unit",
+        "test:feature": "pest --testsuite=Feature",
+        "test:emulator": "pest --testsuite=Emulator --group=emulator",
+        "lint": "pint --test",
+        "analyse": "phpstan analyse --memory-limit=1G"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
