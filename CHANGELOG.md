@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-18
+
+### Fixed
+
+- **JS connector authorization request never fired in browsers** — the
+  default `globalThis.fetch` was invoked with the options object as its
+  receiver, and a browser's `fetch` throws `TypeError: Illegal invocation`
+  for any other receiver, so the `/broadcasting/auth` POST was never sent
+  and private channels never subscribed. The default fetch is now a lazy
+  wrapper, and `fetch`/custom `authorizer` callables are invoked detached.
+
 ## [0.1.1] - 2026-11-18
 
 ### Changed
@@ -62,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI** — PHP 8.2–8.5 tests, lint and static analysis; Node 22/24 JS
   typecheck, build and tests.
 
-[Unreleased]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/hschimpf/laravel-appsync-events/releases/tag/v0.1.0
