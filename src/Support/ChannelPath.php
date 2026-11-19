@@ -14,27 +14,27 @@ use InvalidArgumentException;
  * prefix (`private-`, `private-encrypted-` or none). Presence channels
  * are out of scope for this package: a name starting with `presence-`
  * is rejected with an {@see InvalidArgumentException}. The rest of the
- * name is split on the first `.`: the left side becomes the AppSync
- * channel namespace (falling back to the default namespace when there
- * is no dot) and the right side becomes the path segment with every
- * remaining `.` replaced by `-`.
+ * name is split on `.`: the first part becomes the AppSync channel
+ * namespace (falling back to the default namespace when there is no dot)
+ * and each remaining part becomes a path segment. Dashes stay literal,
+ * so `orders.1.items` (`/orders/public/1/items`) and `orders.1-items`
+ * (`/orders/public/1-items`) are different channels.
  *
- * AppSync requires every segment of a channel path to be non-empty, and a
- * namespace name to be alphanumeric with interior dashes (max 50 chars,
- * see the `Namespace` shape of the AppSync API and
- * https://docs.aws.amazon.com/appsync/latest/eventapi/channel-namespaces.html).
- * Underscores are additionally allowed inside any segment, since the
- * AppSync data plane accepts them. Names that would produce an invalid
- * path are rejected with an {@see InvalidArgumentException} instead of
- * being sent to an endpoint that would refuse them.
+ * AppSync channel paths are limited to 1–5 segments, each 1–50
+ * characters alphanumeric with interior dashes (`[A-Za-z0-9-]`, no
+ * underscores — see the Event API WebSocket protocol reference at
+ * https://docs.aws.amazon.com/appsync/latest/eventapi/event-api-websocket-protocol.html).
+ * Names that would produce more than five path segments or an invalid
+ * segment are rejected with an {@see InvalidArgumentException} instead
+ * of being sent to an endpoint that would refuse them.
  */
 final class ChannelPath
 {
     /**
-     * The charset every produced path segment must satisfy: alphanumeric
-     * at both ends, alphanumerics, dashes and underscores inside.
+     * The charset every produced path segment must satisfy: 1–50 chars,
+     * alphanumeric at both ends, alphanumerics and dashes inside.
      */
-    private const SEGMENT_PATTERN = '/^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?$/';
+    private const SEGMENT_PATTERN = '/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,48}[A-Za-z0-9])?$/';
 
     /**
      * The channel prefixes that mark guarded Laravel channels, longest
@@ -80,17 +80,29 @@ final class ChannelPath
         }
 
         if (str_contains($name, '.')) {
-            [$namespace, $remainder] = explode('.', $name, 2);
-            $segment = str_replace('.', '-', $remainder);
+            $parts = explode('.', $name);
+            $namespace = array_shift($parts);
+            $segments = $parts;
         } else {
             $namespace = $defaultNamespace;
-            $segment = $name;
+            $segments = [$name];
+        }
+
+        if (count($segments) > 3) {
+            throw new InvalidArgumentException(sprintf(
+                'Channel name "%s" produces too many AppSync channel path segments: %d exceeds the limit of 5 segments (namespace, type and at most 3 name segments).',
+                $channelName,
+                count($segments) + 2,
+            ));
         }
 
         self::assertValidSegment($namespace, 'namespace', $channelName);
-        self::assertValidSegment($segment, 'channel', $channelName);
 
-        return "/{$namespace}/{$type}/{$segment}";
+        foreach ($segments as $segment) {
+            self::assertValidSegment($segment, 'channel', $channelName);
+        }
+
+        return "/{$namespace}/{$type}/".implode('/', $segments);
     }
 
     /**
@@ -106,7 +118,7 @@ final class ChannelPath
     {
         if (! (preg_match(self::SEGMENT_PATTERN, $segment) === 1)) {
             throw new InvalidArgumentException(sprintf(
-                'Channel name "%s" produces an invalid AppSync channel path: the %s segment "%s" is empty or contains characters outside [A-Za-z0-9_-].',
+                'Channel name "%s" produces an invalid AppSync channel path: the %s segment "%s" is empty, over 50 characters or contains characters outside [A-Za-z0-9-].',
                 $channelName,
                 $kind,
                 $segment,

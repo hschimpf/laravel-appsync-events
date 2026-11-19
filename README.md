@@ -405,16 +405,18 @@ This is client-side filtering — AppSync has no server-side sender exclusion, s
 
 ## Channel names and AppSync channel paths
 
-Laravel channel names map to AppSync channel paths `/{namespace}/{type}/{segment}` — the mapping is identical in PHP (`ChannelPath`) and TS (`toAppSyncChannel`), verified against a shared fixture:
+Laravel channel names map to AppSync channel paths `/{namespace}/{type}/{segment}[/{segment}…]` — the mapping is identical in PHP (`ChannelPath`) and TS (`toAppSyncChannel`), verified against a shared fixture:
 
 | Laravel channel name | AppSync channel path |
 | --- | --- |
 | `orders` | `/default/public/orders` |
 | `orders.1` | `/orders/public/1` |
-| `orders.1.items` | `/orders/public/1-items` |
+| `orders.1.items` | `/orders/public/1/items` |
+| `orders.1-items` | `/orders/public/1-items` |
 | `private-orders.1` | `/orders/private/1` |
 | `private-private.abc` | `/private/private/abc` |
-| `private-orders.1.items` | `/orders/private/1-items` |
+| `private-orders.1.items` | `/orders/private/1/items` |
+| `private-orders.550e8400-e29b-41d4-a716-446655440000` | `/orders/private/550e8400-e29b-41d4-a716-446655440000` |
 | `private-encrypted-orders.9` | `/orders/private/9` |
 | `private-solo` | `/default/private/solo` |
 | `privateer.x` | `/privateer/public/x` |
@@ -423,9 +425,10 @@ Rules:
 
 - Channel-type prefixes `private-` and `private-encrypted-` (encrypted maps to `private`) select the `{type}` segment; everything else is `public`. Prefixes are exact — `privateer.x` is public.
 - `presence-` names are rejected (`InvalidArgumentException` / `InvalidChannelNameError`) — presence channels are out of scope.
-- The first dot-segment is the **namespace**; remaining dots become dashes. Dotless names use `default_namespace` (`default` unless configured).
+- The first dot-segment is the **namespace**; each further dot-part becomes a path segment (at most 3 — AppSync paths are capped at 5 segments total). Dotless names use `default_namespace` (`default` unless configured).
+- `-` stays literal inside segments, so `orders.1.items` and `orders.1-items` are **different channels** (subscribe tokens are scoped to the path — keep that in mind when picking names).
 - **Create one channel namespace per prefix you use** — subscribing or publishing to a missing namespace fails.
-- Every segment must be alphanumeric at both ends with `[A-Za-z0-9_-]` inside (AppSync namespaces are additionally capped at 50 chars). Invalid names throw `InvalidArgumentException` (PHP) / `InvalidChannelNameError` (JS) instead of hitting the API.
+- Each segment is 1–50 chars, alphanumeric at both ends with `[A-Za-z0-9-]` inside — underscores are not allowed in AppSync channel paths. Invalid names throw `InvalidArgumentException` (PHP) / `InvalidChannelNameError` (JS) instead of hitting the API.
 
 ## Security model
 
