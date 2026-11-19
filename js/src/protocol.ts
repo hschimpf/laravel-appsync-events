@@ -80,7 +80,9 @@ export interface SubscribeErrorMessage {
 
 /**
  * `data` — carries broadcast events; `event` is a JSON string (or an
- * array of JSON strings) of `{"event": ..., "channel": ..., "data": ...}`.
+ * array of JSON strings) of `{"event": ..., "channel": ..., "data": ...}`,
+ * optionally with a `"socket"` envelope field holding the sender's
+ * socket id when the event was published with `->toOthers()`.
  */
 export interface DataMessage {
     type: 'data';

@@ -19,6 +19,8 @@ use Illuminate\Broadcasting\Broadcasters\Broadcaster;
 use Illuminate\Broadcasting\Broadcasters\UsePusherChannelConventions;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
@@ -31,6 +33,10 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  * Publishing uses the IAM authorization mode of the Event API; connecting
  * and subscribing is authorized by a Lambda authorizer that verifies the
  * tokens issued here (see {@see AppSyncAuthorizer}).
+ *
+ * The sender's socket id (from `->toOthers()`) is published as a
+ * top-level `socket` field of the event envelope — outside `data` —
+ * so clients can exclude their own events.
  *
  * @see https://docs.aws.amazon.com/appsync/latest/eventapi/event-api-websocket-protocol.html
  */
@@ -135,6 +141,12 @@ final class AppSyncBroadcaster extends Broadcaster
     /**
      * Publish an event to each given channel through the Event API.
      *
+     * A `socket` entry in the payload (the sender's socket id, set by
+     * {@see InteractsWithSockets} when `->toOthers()` is used) is
+     * lifted out of `data` into a top-level `socket` envelope field;
+     * AppSync has no server-side sender exclusion, so the Echo
+     * connector drops events whose envelope socket matches its own id.
+     *
      * @param  array<int, Channel>  $channels  The channels to broadcast to.
      * @param  string  $event  The broadcast event name.
      * @param  array<string, mixed>  $payload  The event payload.
@@ -147,6 +159,9 @@ final class AppSyncBroadcaster extends Broadcaster
             return;
         }
 
+        $socket = Arr::pull($payload, 'socket');
+        $socket = is_scalar($socket) && (string) $socket !== '' ? (string) $socket : null;
+
         $client = $this->client();
         $signer = new SignatureV4('appsync', $this->resolveRegion());
         $credentials = null;
@@ -158,11 +173,17 @@ final class AppSyncBroadcaster extends Broadcaster
             try {
                 $credentials ??= ($this->credentialsProvider())()->wait();
 
-                $message = json_encode([
+                $envelope = [
                     'event' => $event,
                     'channel' => $path,
                     'data' => $payload,
-                ], JSON_THROW_ON_ERROR);
+                ];
+
+                if ($socket !== null) {
+                    $envelope['socket'] = $socket;
+                }
+
+                $message = json_encode($envelope, JSON_THROW_ON_ERROR);
 
                 $body = json_encode([
                     'channel' => $path,

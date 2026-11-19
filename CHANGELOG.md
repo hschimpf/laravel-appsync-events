@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`->toOthers()` sender exclusion** — the broadcaster lifts the payload's
+  `socket` (the sender's socket id set by `InteractsWithSockets`) into a
+  top-level `socket` field of the published event envelope instead of
+  leaking it into `data`, and the Echo connector drops events whose
+  envelope socket matches its own `socketId()`. AppSync has no
+  server-side sender exclusion, so this is client-side filtering.
+
 ## [0.1.2] - 2026-11-18
 
 ### Fixed
