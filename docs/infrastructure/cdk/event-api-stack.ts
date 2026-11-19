@@ -19,9 +19,11 @@ export interface EventApiStackProps extends StackProps {
     /** IAM principal allowed to publish events (your application's role). */
     readonly publisher: iam.IGrantable;
     /**
-     * AppSync channel namespaces to create. One per dot-prefix used in your
-     * channel names (`orders.1` -> `orders`), plus the default namespace for
-     * dotless names.
+     * AppSync channel namespaces to create — the authorization boundary
+     * channel names map onto (`private-` names under `private`, everything
+     * else under `public`). The namespace named `private` subscribes via
+     * the Lambda authorizer only; the others also accept API_KEY subscribes
+     * when `publicChannels` is enabled. All publish over IAM.
      */
     readonly namespaces?: string[];
     /** Enable API_KEY auth so anonymous/public channels can connect. */
@@ -64,12 +66,18 @@ export class EventApiStack extends Stack {
             },
         });
 
-        const namespaces = props.namespaces ?? ['default', 'orders'];
+        const namespaces = props.namespaces ?? ['public', 'private'];
 
         for (const name of namespaces) {
             new appsync.CfnChannelNamespace(this, `Namespace-${name}`, {
                 apiId: api.attrApiId,
                 name,
+                publishAuthModes: authModes(['AWS_IAM']),
+                subscribeAuthModes: authModes(
+                    name === 'private'
+                        ? ['AWS_LAMBDA']
+                        : props.publicChannels ? ['AWS_LAMBDA', 'API_KEY'] : ['AWS_LAMBDA'],
+                ),
             });
         }
 

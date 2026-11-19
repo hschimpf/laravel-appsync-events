@@ -60,9 +60,11 @@ tests/emulator/stop.sh
 PHP (`ChannelPath`) and TS (`toAppSyncChannel`) must map channel names
 identically. Both test suites consume
 [`tests/fixtures/channel-paths.json`](tests/fixtures/channel-paths.json):
-`valid` entries map `input → expected` per `defaultNamespace`; `invalid`
-entries must throw in both implementations. To add a case, extend the JSON
-only — the tests pick it up automatically.
+each entry gives a `channel` name plus either `path` (the expected
+`/{namespace}/{segment…}` mapping) or `throws: true`, with optional
+`publicNamespace`/`privateNamespace` overrides (defaults `public` /
+`private`). To add a case, extend the JSON only — the tests pick it up
+automatically.
 
 ## Pull request checklist
 

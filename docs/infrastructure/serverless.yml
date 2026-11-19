@@ -58,19 +58,32 @@ resources:
                         - AuthType: AWS_LAMBDA
                         - AuthType: API_KEY
 
-        # Add one channel namespace per dot-prefix your channel names use
-        # (`orders.1` -> `orders`), plus `default` for dotless names.
-        DefaultChannelNamespace:
+        # The two namespaces channel names map onto: `private-` channels
+        # under `private`, everything else under `public` (rename to match
+        # your `appsync-events.namespaces` config). `private` requires the
+        # Lambda authorizer for subscribes; `public` also accepts API_KEY
+        # (drop that entry if you don't need public channels). Both publish
+        # over IAM only.
+        PublicChannelNamespace:
             Type: AWS::AppSync::ChannelNamespace
             Properties:
                 ApiId: !GetAtt AppSyncEventApi.ApiId
-                Name: default
+                Name: public
+                PublishAuthModes:
+                    - AuthType: AWS_IAM
+                SubscribeAuthModes:
+                    - AuthType: AWS_LAMBDA
+                    - AuthType: API_KEY
 
-        OrdersChannelNamespace:
+        PrivateChannelNamespace:
             Type: AWS::AppSync::ChannelNamespace
             Properties:
                 ApiId: !GetAtt AppSyncEventApi.ApiId
-                Name: orders
+                Name: private
+                PublishAuthModes:
+                    - AuthType: AWS_IAM
+                SubscribeAuthModes:
+                    - AuthType: AWS_LAMBDA
 
         AuthorizerInvokePermission:
             Type: AWS::Lambda::Permission
