@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `toAppSyncChannel` now throw `InvalidArgumentException` /
   `InvalidChannelNameError` instead of mapping them to a `presence`
   path; presence channels are out of scope for the package.
+- **Dots in channel names now map to path separators (BREAKING)** —
+  `private-orders.1.items` publishes to `/orders/private/1/items`
+  instead of `/orders/private/1-items`, fixing a collision where
+  `orders.1.items` and `orders.1-items` mapped to the same path while
+  subscribe tokens are scoped per path. Segments also follow AppSync
+  limits now: max 5 path segments, each 1–50 chars `[A-Za-z0-9-]` —
+  underscores and over-long/too-many segments are rejected.
+  Namespaces and IAM policies are unaffected (they're namespace-scoped),
+  but subscribers or handlers hard-coding dash-mapped paths must be
+  updated.
 
 ## [0.1.2] - 2026-11-18
 
