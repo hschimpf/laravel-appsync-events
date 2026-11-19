@@ -40,3 +40,8 @@ it('rejects channel names that produce invalid paths', function (array $case): v
     ])
     ->all())
     ->throws(InvalidArgumentException::class);
+
+it('rejects presence- channel names as unsupported', function (string $channel): void {
+    ChannelPath::from($channel);
+})->with(['presence-room.5', 'presence-lobby', 'presence-'])
+    ->throws(InvalidArgumentException::class, 'presence channels (presence- prefix) are not supported');

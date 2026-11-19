@@ -34,4 +34,12 @@ describe('toAppSyncChannel', () => {
                 .toThrow(InvalidChannelNameError);
         },
     );
+
+    it.each(['presence-room.5', 'presence-lobby', 'presence-'])(
+        'rejects %s as an unsupported presence channel',
+        (channel) => {
+            expect(() => toAppSyncChannel(channel))
+                .toThrow('presence channels (presence- prefix) are not supported');
+        },
+    );
 });

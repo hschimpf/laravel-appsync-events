@@ -10,12 +10,14 @@ use InvalidArgumentException;
  * Maps a Laravel broadcasting channel name to an AWS AppSync Events
  * channel path of the form `/{namespace}/{type}/{segment}`.
  *
- * `{type}` is `private`, `presence` or `public`, taken from the
- * Laravel/Echo channel prefix (`private-`, `private-encrypted-`,
- * `presence-` or none). The rest of the name is split on the first `.`:
- * the left side becomes the AppSync channel namespace (falling back to
- * the default namespace when there is no dot) and the right side becomes
- * the path segment with every remaining `.` replaced by `-`.
+ * `{type}` is `private` or `public`, taken from the Laravel/Echo channel
+ * prefix (`private-`, `private-encrypted-` or none). Presence channels
+ * are out of scope for this package: a name starting with `presence-`
+ * is rejected with an {@see InvalidArgumentException}. The rest of the
+ * name is split on the first `.`: the left side becomes the AppSync
+ * channel namespace (falling back to the default namespace when there
+ * is no dot) and the right side becomes the path segment with every
+ * remaining `.` replaced by `-`.
  *
  * AppSync requires every segment of a channel path to be non-empty, and a
  * namespace name to be alphanumeric with interior dashes (max 50 chars,
@@ -42,7 +44,6 @@ final class ChannelPath
      */
     private const TYPES = [
         'private-encrypted-' => 'private',
-        'presence-' => 'presence',
         'private-' => 'private',
     ];
 
@@ -50,15 +51,23 @@ final class ChannelPath
      * Build the AppSync channel path for a Laravel channel name.
      *
      * @param  string  $channelName  The channel name as it appears on the wire
-     *                               (e.g. `private-orders.1`, `presence-lobby`, `orders`).
+     *                               (e.g. `private-orders.1`, `orders`).
      * @param  string  $defaultNamespace  The AppSync namespace used when the name
      *                                    carries no `.`-separated namespace part.
      * @return string The channel path `/{namespace}/{type}/{segment}`.
      *
-     * @throws InvalidArgumentException When the name would produce an invalid channel path.
+     * @throws InvalidArgumentException When the name is a presence channel or
+     *                                  would produce an invalid channel path.
      */
     public static function from(string $channelName, string $defaultNamespace = 'default'): string
     {
+        if (str_starts_with($channelName, 'presence-')) {
+            throw new InvalidArgumentException(sprintf(
+                'Channel name "%s" is not supported: presence channels (presence- prefix) are not supported by AppSync Events.',
+                $channelName,
+            ));
+        }
+
         $type = 'public';
         $name = $channelName;
 
