@@ -23,7 +23,8 @@ final class EnvConfigTest extends EnvConfigTestCase
         $this->assertSame('wss://envid.appsync-realtime-api.eu-west-1.amazonaws.com/event/realtime', config('appsync-events.realtime_endpoint'));
         $this->assertSame('env-secret', config('appsync-events.signing_secret'));
         $this->assertSame('env-old-secret, env-older-secret', config('appsync-events.previous_signing_secrets'));
-        $this->assertSame('env-ns', config('appsync-events.default_namespace'));
+        $this->assertSame('env-pub', config('appsync-events.namespaces.public'));
+        $this->assertSame('env-priv', config('appsync-events.namespaces.private'));
     }
 
     #[Test]

@@ -26,7 +26,7 @@ for (const name of expected) {
     assert.ok(pkg[name], `missing CJS export: ${name}`);
 }
 
-assert.equal(pkg.toAppSyncChannel('private-orders.1'), '/orders/private/1');
-assert.equal(pkg.toAppSyncChannel('orders.1'), '/orders/public/1');
+assert.equal(pkg.toAppSyncChannel('private-orders.1'), '/private/orders/1');
+assert.equal(pkg.toAppSyncChannel('orders.1'), '/public/orders/1');
 
 console.log('CJS smoke test passed');

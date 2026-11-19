@@ -66,16 +66,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Default channel namespace
+    | Channel namespaces
     |--------------------------------------------------------------------------
     |
-    | The AppSync channel namespace used for channel names that carry no
-    | `.`-separated namespace part (e.g. `orders` maps to
-    | `/{default_namespace}/public/orders`).
+    | The AppSync channel namespaces channel names are mapped onto:
+    | `private-` channels resolve under `private`, everything else under
+    | `public` (e.g. `private-orders.1` -> `/private/orders/1`, `orders` ->
+    | `/public/orders`). Namespaces are the AppSync authorization boundary
+    | and each may carry its own authorization mode, so these values must
+    | match the namespaces created on the Event API.
     |
     */
 
-    'default_namespace' => env('APPSYNC_DEFAULT_NAMESPACE', 'default'),
+    'namespaces' => [
+        'public' => env('APPSYNC_PUBLIC_NAMESPACE', 'public'),
+        'private' => env('APPSYNC_PRIVATE_NAMESPACE', 'private'),
+    ],
 
     /*
     |--------------------------------------------------------------------------

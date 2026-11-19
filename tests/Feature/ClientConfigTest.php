@@ -21,7 +21,8 @@ it('returns the documented client configuration for a user', function (): void {
         'wsEndpoint' => 'wss://abc123.appsync-realtime-api.eu-west-1.amazonaws.com/event/realtime',
         'httpHost' => 'abc123.appsync-api.eu-west-1.amazonaws.com',
         'authEndpoint' => '/broadcasting/auth',
-        'defaultNamespace' => 'default',
+        'publicNamespace' => 'public',
+        'privateNamespace' => 'private',
         'inactivityTimeout' => 10,
     ]);
 

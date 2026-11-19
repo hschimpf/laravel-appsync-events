@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Facade;
  *
  * @method static string uid(object $user) Resolve the uid claim for a user.
  * @method static static resolveUidUsing(Closure $resolver) Replace the uid resolution strategy at runtime.
- * @method static array{wsEndpoint: string, httpHost: string, connectToken: string, authEndpoint: string, defaultNamespace: string, inactivityTimeout: int}|null clientConfig(?Authenticatable $user = null) Build the JS connector configuration (null for guests).
+ * @method static array{wsEndpoint: string, httpHost: string, connectToken: string, authEndpoint: string, publicNamespace: string, privateNamespace: string, inactivityTimeout: int}|null clientConfig(?Authenticatable $user = null) Build the JS connector configuration (null for guests).
  * @method static TokenSigner signer() The token signer built from the configured signing secret.
  * @method static string httpHost(string $endpoint) Extract the `host[:port]` authority from an endpoint URL.
  *

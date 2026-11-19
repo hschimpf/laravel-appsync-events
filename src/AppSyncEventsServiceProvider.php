@@ -96,7 +96,7 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
      * The driver factory merges the broadcasting connection definition
      * over the package config (`$connection + config('appsync-events')`),
      * so a connection may override `http_endpoint`, `signing_secret`,
-     * `region`, `default_namespace` and the HTTP timeout settings. A
+     * `region`, `namespaces` and the HTTP timeout settings. A
      * dedicated TokenSigner is built from the effective secret so
      * per-connection secrets are honoured.
      *
@@ -235,11 +235,14 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
             ? ($connection['previous_signing_secrets'] ?? null)
             : ($settings['previous_signing_secrets'] ?? null);
 
+        $namespaces = is_array($settings['namespaces'] ?? null) ? $settings['namespaces'] : [];
+
         return new AppSyncBroadcaster(
             signer: new TokenSigner($secret, $previousSecrets),
             httpEndpoint: $httpEndpoint,
             region: is_string($settings['region'] ?? null) ? $settings['region'] : null,
-            defaultNamespace: is_string($settings['default_namespace'] ?? null) ? $settings['default_namespace'] : 'default',
+            publicNamespace: is_string($namespaces['public'] ?? null) ? $namespaces['public'] : 'public',
+            privateNamespace: is_string($namespaces['private'] ?? null) ? $namespaces['private'] : 'private',
             subscribeTokenTtl: (int) ($settings['tokens']['subscribe_ttl'] ?? 3600),
             uidResolver: fn (object $user): string => $app->make(AppSyncEventsManager::class)->uid($user),
             timeout: (float) ($settings['http']['timeout'] ?? 2.0),

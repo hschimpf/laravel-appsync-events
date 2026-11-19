@@ -63,8 +63,10 @@ final class AppSyncBroadcaster extends Broadcaster
      *                                `http://host:port/event` is accepted for local testing).
      * @param  string|null  $region  AWS region used for signing when it cannot be
      *                               parsed from the endpoint host; defaults to `us-east-1`.
-     * @param  string  $defaultNamespace  AppSync channel namespace for channel
-     *                                    names without a `.`-separated namespace part.
+     * @param  string  $publicNamespace  AppSync channel namespace public channel
+     *                                   names are mapped onto.
+     * @param  string  $privateNamespace  AppSync channel namespace `private-`
+     *                                    channel names are mapped onto.
      * @param  int  $subscribeTokenTtl  Lifetime in seconds of issued subscribe tokens.
      * @param  Closure|null  $uidResolver  Maps an authenticated user to the `uid`
      *                                     claim; defaults to `getAuthIdentifier()`.
@@ -80,7 +82,8 @@ final class AppSyncBroadcaster extends Broadcaster
         private readonly TokenSigner $signer,
         private readonly string $httpEndpoint,
         private readonly ?string $region = null,
-        private readonly string $defaultNamespace = 'default',
+        private readonly string $publicNamespace = 'public',
+        private readonly string $privateNamespace = 'private',
         private readonly int $subscribeTokenTtl = 3600,
         private readonly ?Closure $uidResolver = null,
         private readonly ?ClientInterface $client = null,
@@ -221,11 +224,11 @@ final class AppSyncBroadcaster extends Broadcaster
      * broadcaster publishes to and issues tokens for.
      *
      * @param  string  $channelName  The channel name (prefixes included).
-     * @return string The channel path `/{namespace}/{type}/{segment}`.
+     * @return string The channel path `/{namespace}/{segment}`.
      */
     public function channelPath(string $channelName): string
     {
-        return ChannelPath::from($channelName, $this->defaultNamespace);
+        return ChannelPath::from($channelName, $this->publicNamespace, $this->privateNamespace);
     }
 
     /**

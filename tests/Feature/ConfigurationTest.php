@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 it('merges the package config defaults', function (): void {
-    expect(config('appsync-events.default_namespace'))->toBe('default')
+    expect(config('appsync-events.namespaces.public'))->toBe('public')
+        ->and(config('appsync-events.namespaces.private'))->toBe('private')
         ->and(config('appsync-events.tokens.connect_ttl'))->toBe(43200)
         ->and(config('appsync-events.tokens.subscribe_ttl'))->toBe(3600)
         ->and(config('appsync-events.authorizer.cache_ttl'))->toBe(300)
