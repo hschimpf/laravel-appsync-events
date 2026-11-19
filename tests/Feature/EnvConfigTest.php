@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace HDSSolutions\Laravel\AppSyncEvents\Tests\Feature;
 
+use HDSSolutions\Laravel\AppSyncEvents\Auth\TokenSigner;
+use HDSSolutions\Laravel\AppSyncEvents\Facades\AppSyncEvents;
 use HDSSolutions\Laravel\AppSyncEvents\Tests\Fixtures\EnvConfigTestCase;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -20,6 +22,15 @@ final class EnvConfigTest extends EnvConfigTestCase
         $this->assertSame('https://envid.appsync-api.eu-west-1.amazonaws.com/event', config('appsync-events.http_endpoint'));
         $this->assertSame('wss://envid.appsync-realtime-api.eu-west-1.amazonaws.com/event/realtime', config('appsync-events.realtime_endpoint'));
         $this->assertSame('env-secret', config('appsync-events.signing_secret'));
+        $this->assertSame('env-old-secret, env-older-secret', config('appsync-events.previous_signing_secrets'));
         $this->assertSame('env-ns', config('appsync-events.default_namespace'));
+    }
+
+    #[Test]
+    public function it_verifies_tokens_signed_with_a_previous_secret_from_the_environment(): void
+    {
+        $token = (new TokenSigner('env-older-secret'))->connectToken('u-9');
+
+        $this->assertSame('u-9', AppSyncEvents::signer()->verify($token)['uid']);
     }
 }

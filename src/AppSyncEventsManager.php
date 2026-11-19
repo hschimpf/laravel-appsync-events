@@ -147,14 +147,18 @@ final class AppSyncEventsManager
     }
 
     /**
-     * The token signer built from the configured signing secret.
+     * The token signer built from the configured signing secret, also
+     * accepting `previous_signing_secrets` for verification.
      *
      * @throws ConfigurationException When `appsync-events.signing_secret`
      *                                / `APPSYNC_CHANNEL_SIGNING_SECRET` is missing.
      */
     public function signer(): TokenSigner
     {
-        return $this->signer ??= new TokenSigner($this->signingSecret());
+        return $this->signer ??= new TokenSigner(
+            $this->signingSecret(),
+            $this->config->get('appsync-events.previous_signing_secrets'),
+        );
     }
 
     /**

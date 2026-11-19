@@ -22,6 +22,7 @@ abstract class EnvConfigTestCase extends TestCase
         'APPSYNC_HTTP_ENDPOINT' => 'https://envid.appsync-api.eu-west-1.amazonaws.com/event',
         'APPSYNC_REALTIME_ENDPOINT' => 'wss://envid.appsync-realtime-api.eu-west-1.amazonaws.com/event/realtime',
         'APPSYNC_CHANNEL_SIGNING_SECRET' => 'env-secret',
+        'APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS' => 'env-old-secret, env-older-secret',
         'APPSYNC_DEFAULT_NAMESPACE' => 'env-ns',
     ];
 

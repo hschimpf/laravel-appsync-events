@@ -20,22 +20,84 @@ use InvalidArgumentException;
  * timestamp) and, for subscribe tokens, `channel` (the AppSync channel
  * path the token is scoped to).
  *
+ * For zero-downtime secret rotation a list of previous secrets may be
+ * given: they are accepted by {@see verify()} only — {@see sign()}
+ * always uses the primary secret, so tokens issued after deploying a
+ * new secret are signed with it while tokens minted under the old one
+ * keep verifying until they expire.
+ *
  * @see https://docs.aws.amazon.com/appsync/latest/eventapi/configure-event-api-auth.html
  */
 final class TokenSigner
 {
     /**
+     * Previous secrets still accepted for verification, never for signing.
+     *
+     * @var list<string>
+     */
+    private readonly array $previousSecrets;
+
+    /**
      * Create a signer bound to a shared secret.
      *
      * @param  string  $secret  The HMAC secret shared with the Lambda authorizer.
+     * @param  array<array-key, mixed>|string|null  $previousSecrets  Previous
+     *                                                                secrets still accepted for verification during
+     *                                                                rotation — a list, or a comma-separated string as
+     *                                                                `APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS` carries.
      *
      * @throws InvalidArgumentException When the secret is empty.
      */
-    public function __construct(private readonly string $secret)
-    {
+    public function __construct(
+        private readonly string $secret,
+        array|string|null $previousSecrets = null,
+    ) {
         if ($secret === '') {
             throw new InvalidArgumentException('The token signing secret must not be empty.');
         }
+
+        $this->previousSecrets = self::normalizeSecrets($previousSecrets);
+    }
+
+    /**
+     * Normalize a previous-secrets configuration value to a list of
+     * non-empty strings.
+     *
+     * A string is split on commas; entries are trimmed; empty and
+     * non-string entries are dropped; duplicates are removed with order
+     * preserved. An empty-string secret is never returned — an empty HMAC
+     * key would let anyone forge signatures.
+     *
+     * @param  array<array-key, mixed>|string|null  $secrets  The raw configuration value.
+     * @return list<string> The usable previous secrets.
+     */
+    public static function normalizeSecrets(array|string|null $secrets): array
+    {
+        if (is_string($secrets)) {
+            $secrets = explode(',', $secrets);
+        }
+
+        if (! is_array($secrets)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($secrets as $secret) {
+            if (! is_string($secret)) {
+                continue;
+            }
+
+            $secret = trim($secret);
+
+            if ($secret === '' || in_array($secret, $normalized, true)) {
+                continue;
+            }
+
+            $normalized[] = $secret;
+        }
+
+        return $normalized;
     }
 
     /**
@@ -71,9 +133,22 @@ final class TokenSigner
 
         [$payload, $signature] = $parts;
 
-        $expected = hash_hmac('sha256', $payload, $this->secret);
+        // The digest is computed for every configured secret rather than
+        // exiting on the first match, so the time spent verifying does
+        // not reveal which secret signed the token.
+        $signatureMatches = hash_equals(
+            hash_hmac('sha256', $payload, $this->secret),
+            $signature,
+        );
 
-        if (! hash_equals($expected, $signature)) {
+        foreach ($this->previousSecrets as $previousSecret) {
+            $signatureMatches = hash_equals(
+                hash_hmac('sha256', $payload, $previousSecret),
+                $signature,
+            ) || $signatureMatches;
+        }
+
+        if (! $signatureMatches) {
             throw new InvalidTokenException('Invalid token signature.');
         }
 
