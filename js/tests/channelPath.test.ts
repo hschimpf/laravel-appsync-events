@@ -10,7 +10,8 @@ import { InvalidChannelNameError, toAppSyncChannel } from '../src/channelPath.js
  */
 type FixtureCase = {
     channel: string;
-    defaultNamespace?: string;
+    publicNamespace?: string;
+    privateNamespace?: string;
     path?: string;
     throws?: boolean;
 };
@@ -22,16 +23,23 @@ const fixture = JSON.parse(
 describe('toAppSyncChannel', () => {
     it.each(fixture.filter((c) => !c.throws))(
         'maps $channel to $path',
-        ({ channel, defaultNamespace, path }) => {
-            expect(toAppSyncChannel(channel, defaultNamespace ?? 'default')).toBe(path);
+        ({ channel, publicNamespace, privateNamespace, path }) => {
+            expect(toAppSyncChannel(
+                channel,
+                publicNamespace ?? 'public',
+                privateNamespace ?? 'private',
+            )).toBe(path);
         },
     );
 
     it.each(fixture.filter((c) => c.throws))(
         'rejects $channel',
-        ({ channel, defaultNamespace }) => {
-            expect(() => toAppSyncChannel(channel, defaultNamespace ?? 'default'))
-                .toThrow(InvalidChannelNameError);
+        ({ channel, publicNamespace, privateNamespace }) => {
+            expect(() => toAppSyncChannel(
+                channel,
+                publicNamespace ?? 'public',
+                privateNamespace ?? 'private',
+            )).toThrow(InvalidChannelNameError);
         },
     );
 
@@ -42,4 +50,17 @@ describe('toAppSyncChannel', () => {
                 .toThrow('presence channels (presence- prefix) are not supported');
         },
     );
+
+    it('rejects private-encrypted- channel names as unsupported', () => {
+        expect(() => toAppSyncChannel('private-encrypted-orders.9'))
+            .toThrow(
+                'payload encryption is not implemented by this package, ' +
+                'so private-encrypted channels are not supported (use private-)',
+            );
+    });
+
+    it('rejects channel names that exceed the 5-segment AppSync limit', () => {
+        expect(() => toAppSyncChannel('private-org.1.team.2.board'))
+            .toThrow('6 exceeds the limit of 5 segments (namespace and at most 4 channel name segments)');
+    });
 });
