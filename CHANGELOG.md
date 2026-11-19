@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now denies `EVENT_SUBSCRIBE` unless the token has a non-empty string
   `channel` claim equal to the requested channel. Tokens issued by this
   package always include it.
+- **`presence-` channel names are rejected** — `ChannelPath` /
+  `toAppSyncChannel` now throw `InvalidArgumentException` /
+  `InvalidChannelNameError` instead of mapping them to a `presence`
+  path; presence channels are out of scope for the package.
 
 ## [0.1.2] - 2026-11-18
 

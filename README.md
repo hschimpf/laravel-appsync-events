@@ -417,12 +417,12 @@ Laravel channel names map to AppSync channel paths `/{namespace}/{type}/{segment
 | `private-orders.1.items` | `/orders/private/1-items` |
 | `private-encrypted-orders.9` | `/orders/private/9` |
 | `private-solo` | `/default/private/solo` |
-| `presence-room.5` | `/room/presence/5` |
 | `privateer.x` | `/privateer/public/x` |
 
 Rules:
 
-- Channel-type prefixes `private-`, `private-encrypted-` (encrypted maps to `private`) and `presence-` select the `{type}` segment; everything else is `public`. Prefixes are exact — `privateer.x` is public.
+- Channel-type prefixes `private-` and `private-encrypted-` (encrypted maps to `private`) select the `{type}` segment; everything else is `public`. Prefixes are exact — `privateer.x` is public.
+- `presence-` names are rejected (`InvalidArgumentException` / `InvalidChannelNameError`) — presence channels are out of scope.
 - The first dot-segment is the **namespace**; remaining dots become dashes. Dotless names use `default_namespace` (`default` unless configured).
 - **Create one channel namespace per prefix you use** — subscribing or publishing to a missing namespace fails.
 - Every segment must be alphanumeric at both ends with `[A-Za-z0-9_-]` inside (AppSync namespaces are additionally capped at 50 chars). Invalid names throw `InvalidArgumentException` (PHP) / `InvalidChannelNameError` (JS) instead of hitting the API.
@@ -453,7 +453,7 @@ Emulator tests, fixture conventions and the PR checklist live in [CONTRIBUTING.m
 
 ## Limitations
 
-- **No presence channels** — `echo.join()` / `presenceChannel()` throws; presence metadata has no AppSync Events equivalent.
+- **No presence channels** — `echo.join()` / `presenceChannel()` throws, and channel names starting with `presence-` are rejected (`InvalidArgumentException` / `InvalidChannelNameError`); presence metadata has no AppSync Events equivalent.
 - **No client events / whispers** — clients cannot publish by design.
 - **One Echo connector instance per socket** — the connector multiplexes channels over a single AppSync WebSocket; concurrent reconnects reuse the latest connect generation only.
 - **Emulator caveats** — see [tests/emulator/README.md](tests/emulator/README.md).
