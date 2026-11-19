@@ -16,7 +16,15 @@ use HDSSolutions\Laravel\AppSyncEvents\Auth\TokenSigner;
  * or the environment — so it can be invoked from any PHP Lambda runtime
  * with a single line:
  *
- *     return (new AppSyncAuthorizer($_ENV['APPSYNC_SIGNING_SECRET']))->authorize($event);
+ *     return (new AppSyncAuthorizer(
+ *         $_ENV['APPSYNC_CHANNEL_SIGNING_SECRET'] ?? '',
+ *         previousSecrets: $_ENV['APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS'] ?? '',
+ *     ))->authorize($event);
+ *
+ * `previousSecrets` supports zero-downtime secret rotation: tokens
+ * signed with any listed previous secret still verify while clients
+ * holding them reconnect. An empty primary secret denies everything,
+ * even when previous secrets are configured.
  *
  * Authorization rules:
  *  - `EVENT_CONNECT` requires a verified token with purpose `connect`,
@@ -47,10 +55,15 @@ final class AppSyncAuthorizer
     /**
      * @param  string  $signingSecret  The HMAC secret shared with the token issuer.
      * @param  int  $cacheTtl  `ttlOverride` (seconds) returned on authorized calls.
+     * @param  array<array-key, mixed>|string|null  $previousSecrets  Previous
+     *                                                                secrets still accepted for verification during
+     *                                                                rotation — a list, or a comma-separated string as
+     *                                                                `APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS` carries.
      */
     public function __construct(
         private readonly string $signingSecret,
         private readonly int $cacheTtl = 300,
+        private readonly array|string|null $previousSecrets = null,
     ) {}
 
     /**
@@ -116,7 +129,7 @@ final class AppSyncAuthorizer
     {
         return $this->signer ??= $this->signingSecret === ''
             ? null
-            : new TokenSigner($this->signingSecret);
+            : new TokenSigner($this->signingSecret, $this->previousSecrets);
     }
 
     /**

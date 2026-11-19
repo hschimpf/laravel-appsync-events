@@ -167,3 +167,43 @@ it('honours a custom cache ttl', function (): void {
 
     expect($result['ttlOverride'])->toBe(60);
 });
+
+it('authorizes tokens signed with a previous secret', function (array|string $previous): void {
+    $authorizer = new AppSyncAuthorizer('new-secret', 300, $previous);
+    $oldSigner = new TokenSigner('old-secret');
+
+    $connect = $authorizer->authorize(
+        authorizerEvent('EVENT_CONNECT', $oldSigner->connectToken('user-1')),
+    );
+    $subscribe = $authorizer->authorize(
+        authorizerEvent('EVENT_SUBSCRIBE', $oldSigner->subscribeToken('user-1', '/orders/private/1'), '/orders/private/1'),
+    );
+
+    expect($connect['isAuthorized'])->toBeTrue()
+        ->and($subscribe['isAuthorized'])->toBeTrue()
+        ->and($subscribe['handlerContext']['uid'])->toBe('user-1');
+})->with([
+    'string form' => ['old-secret'],
+    'array form' => [['old-secret']],
+    'comma-separated form' => ['older-secret, old-secret'],
+]);
+
+it('denies a previous-secret token when it is not listed', function (): void {
+    $token = (new TokenSigner('old-secret'))->connectToken('user-1');
+
+    $result = (new AppSyncAuthorizer('new-secret'))
+        ->authorize(authorizerEvent('EVENT_CONNECT', $token));
+
+    expect($result['isAuthorized'])->toBeFalse()
+        ->and($result['ttlOverride'])->toBe(0);
+});
+
+it('denies everything for an empty primary secret even with previous secrets', function (): void {
+    $token = (new TokenSigner('old-secret'))->connectToken('user-1');
+
+    $result = (new AppSyncAuthorizer('', 300, 'old-secret'))
+        ->authorize(authorizerEvent('EVENT_CONNECT', $token));
+
+    expect($result['isAuthorized'])->toBeFalse()
+        ->and($result['ttlOverride'])->toBe(0);
+});

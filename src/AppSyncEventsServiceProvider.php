@@ -73,13 +73,17 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
     private function registerBindings(): void
     {
         $this->app->bind(TokenSigner::class, function (Container $app): TokenSigner {
-            return new TokenSigner($this->signingSecret($app));
+            return new TokenSigner(
+                $this->signingSecret($app),
+                $app->make(ConfigRepository::class)->get('appsync-events.previous_signing_secrets'),
+            );
         });
 
         $this->app->bind(AppSyncAuthorizer::class, function (Container $app): AppSyncAuthorizer {
             return new AppSyncAuthorizer(
                 $this->signingSecret($app),
                 (int) $app->make(ConfigRepository::class)->get('appsync-events.authorizer.cache_ttl', 300),
+                $app->make(ConfigRepository::class)->get('appsync-events.previous_signing_secrets'),
             );
         });
 
@@ -224,8 +228,15 @@ final class AppSyncEventsServiceProvider extends ServiceProvider
             );
         }
 
+        // A connection that defines its own `signing_secret` must also
+        // define its own `previous_signing_secrets` — the package-level
+        // previous list belongs to the package-level primary secret.
+        $previousSecrets = array_key_exists('signing_secret', $connection)
+            ? ($connection['previous_signing_secrets'] ?? null)
+            : ($settings['previous_signing_secrets'] ?? null);
+
         return new AppSyncBroadcaster(
-            signer: new TokenSigner($secret),
+            signer: new TokenSigner($secret, $previousSecrets),
             httpEndpoint: $httpEndpoint,
             region: is_string($settings['region'] ?? null) ? $settings['region'] : null,
             defaultNamespace: is_string($settings['default_namespace'] ?? null) ? $settings['default_namespace'] : 'default',

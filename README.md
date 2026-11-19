@@ -182,6 +182,7 @@ return function (array $event): array {
     return (new AppSyncAuthorizer(
         $_ENV['APPSYNC_CHANNEL_SIGNING_SECRET'] ?? '',
         (int) ($_ENV['APPSYNC_AUTHORIZER_CACHE_TTL'] ?? 300),
+        $_ENV['APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS'] ?? '',
     ))->authorize($event);
 };
 ```
@@ -207,6 +208,7 @@ final class AppsyncEventsAuthorizer implements Handler
         // resolve from the container instead: app(AppSyncAuthorizer::class)
         return (new AppSyncAuthorizer(
             $_ENV['APPSYNC_CHANNEL_SIGNING_SECRET'] ?? '',
+            previousSecrets: $_ENV['APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS'] ?? '',
         ))->authorize($event);
     }
 }
@@ -236,6 +238,7 @@ functions:
 | `http_endpoint` | `APPSYNC_HTTP_ENDPOINT` | — | Event API HTTP endpoint the broadcaster POSTs to. **Required.** |
 | `realtime_endpoint` | `APPSYNC_REALTIME_ENDPOINT` | — | WebSocket endpoint handed to the JS connector. **Required for `clientConfig()`.** |
 | `signing_secret` | `APPSYNC_CHANNEL_SIGNING_SECRET` | — | HMAC secret shared with the Lambda authorizer. **Required.** |
+| `previous_signing_secrets` | `APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS` | — | Comma-separated previous secrets still accepted for verification during rotation; never used for signing. Optional. |
 | `region` | `APPSYNC_REGION` → `AWS_DEFAULT_REGION` | `us-east-1` | SigV4 region fallback when it can't be parsed from `http_endpoint`. |
 | `default_namespace` | `APPSYNC_DEFAULT_NAMESPACE` | `default` | Namespace for channel names without a dot. |
 | `tokens.connect_ttl` | — | `43200` | Connect token lifetime, seconds (12 h). |
@@ -254,7 +257,7 @@ functions:
 
 ### Per-connection overrides
 
-The `appsync` broadcasting connection merges over the package config, so `config/broadcasting.php` may override `http_endpoint`, `signing_secret`, `region`, `default_namespace` and `http.*` per connection:
+The `appsync` broadcasting connection merges over the package config, so `config/broadcasting.php` may override `http_endpoint`, `signing_secret`, `previous_signing_secrets`, `region`, `default_namespace` and `http.*` per connection. A connection that sets its own `signing_secret` must also set its own `previous_signing_secrets` — the package-level previous list is never carried onto a different primary secret:
 
 ```php
 'connections' => [
@@ -435,7 +438,13 @@ Rules:
 - **Token wire format** — `base64url(json(claims)) + '.' + hex(hmac_sha256(payload, secret))`. Claims: `purpose` (`connect`/`subscribe`), `uid`, `exp` (unix), and `channel` (the AppSync path) on subscribe tokens. The secret is shared only between your app and the authorizer — never sent to AWS or clients.
 - **TTLs** — `tokens.connect_ttl` (default 12 h) and `tokens.subscribe_ttl` (1 h). `authorizer.cache_ttl` is the `ttlOverride` returned on authorized calls — how long AppSync may cache the decision.
 - **Publish is never client-authorized** — `EVENT_PUBLISH` is denied unconditionally; publishing requires IAM `appsync:EventPublish`.
-- **Secret hygiene** — keep `APPSYNC_CHANNEL_SIGNING_SECRET` out of VCS (use SSM/Secrets Manager for the Lambda side). To rotate: deploy the new secret to the app and the authorizer together — outstanding tokens become invalid, so clients reconnect and re-authorize.
+- **Secret hygiene** — keep `APPSYNC_CHANNEL_SIGNING_SECRET` out of VCS (use SSM/Secrets Manager for the Lambda side). Rotate without downtime:
+    1. Generate a new secret — `php artisan appsync-events:secret --show` prints 64 hex chars without touching `.env` (or `openssl rand -hex 32`).
+    2. Deploy the **authorizer first** with `APPSYNC_CHANNEL_SIGNING_SECRET=<new>` and `APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS=<old>` — it now verifies both.
+    3. Deploy the Laravel app with the new `APPSYNC_CHANNEL_SIGNING_SECRET` — it signs new tokens immediately; clients receive them on their next auth/`clientConfig` call.
+    4. Once the longest token TTL has elapsed — connect tokens default to 12 h (`tokens.connect_ttl`), subscribe tokens to 1 h (`tokens.subscribe_ttl`) — remove `APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS` from the authorizer.
+
+    Clients holding tokens signed with the old secret simply reconnect and re-authorize with fresh tokens; already-authorized sockets are unaffected.
 - **Least privilege** — scope `appsync:EventPublish` to the namespaces you use, and the authorizer's `SourceArn` to the API.
 - **Testing** — the [AWS emulator](tests/emulator/README.md) used by the test suite does **not** verify SigV4 signatures, does not invoke Lambda authorizers, and does not validate token contents; those paths are covered by unit tests. Do not use the emulator for security testing.
 

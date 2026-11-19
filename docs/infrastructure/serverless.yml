@@ -27,6 +27,8 @@ functions:
         #   plugins: [./vendor/bref/bref]
         environment:
             APPSYNC_CHANNEL_SIGNING_SECRET: ${ssm:/my-app/appsync-signing-secret}
+            # Optional, while rotating the signing secret (see README "Secret hygiene"):
+            # APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS: ${ssm:/my-app/appsync-previous-signing-secrets}
             # The authorizer must never broadcast itself (see README):
             BROADCAST_CONNECTION: log
             APPSYNC_HTTP_ENDPOINT: ''

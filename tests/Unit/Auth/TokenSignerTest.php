@@ -102,3 +102,58 @@ it('honours custom connect token ttl', function (): void {
 
     expect($claims['exp'])->toBeLessThanOrEqual(time() + 10);
 });
+
+it('verifies tokens signed with a previous secret', function (): void {
+    $rotated = new TokenSigner('new-secret', 'old-secret');
+
+    $claims = $rotated->verify((new TokenSigner('old-secret'))->connectToken('u-1'));
+
+    expect($claims['uid'])->toBe('u-1');
+});
+
+it('rejects tokens signed with a secret that is not listed', function (): void {
+    $rotated = new TokenSigner('new-secret', 'old-secret');
+
+    $rotated->verify((new TokenSigner('other-secret'))->connectToken('u-1'));
+})->throws(InvalidTokenException::class, 'Invalid token signature.');
+
+it('denies a previous-secret token when the secret is not listed', function (): void {
+    $signer = new TokenSigner('new-secret');
+
+    $signer->verify((new TokenSigner('old-secret'))->connectToken('u-1'));
+})->throws(InvalidTokenException::class, 'Invalid token signature.');
+
+it('signs only with the primary secret', function (): void {
+    $token = (new TokenSigner('new-secret', 'old-secret'))->connectToken('u-1');
+
+    expect((new TokenSigner('new-secret'))->verify($token)['uid'])->toBe('u-1');
+    expect(static fn () => (new TokenSigner('old-secret'))->verify($token))
+        ->toThrow(InvalidTokenException::class);
+});
+
+it('normalizes previous secrets', function (array|string|null $secrets, array $expected): void {
+    expect(TokenSigner::normalizeSecrets($secrets))->toBe($expected);
+})->with([
+    'comma-separated string' => ['a,b', ['a', 'b']],
+    'whitespace-padded entries' => [' a , b ', ['a', 'b']],
+    'empty entries' => ['a,,b,', ['a', 'b']],
+    'empty string' => ['', []],
+    'null' => [null, []],
+    'empty array' => [[], []],
+    'array with blanks' => [['a', ' ', ''], ['a']],
+    'non-string entries' => [['a', 42, null], ['a']],
+    'duplicates' => ['a,b,a', ['a', 'b']],
+    'order preserved' => ['c,a,b', ['c', 'a', 'b']],
+]);
+
+it('never accepts a signature forged with an empty key', function (array|string $previous): void {
+    $payload = rtrim(strtr(base64_encode('{"purpose":"connect","uid":"u-1","exp":4102444800}'), '+/', '-_'), '=');
+    $forged = $payload.'.'.hash_hmac('sha256', $payload, '');
+
+    (new TokenSigner('secret', $previous))->verify($forged);
+})->with([
+    'trailing comma' => ['old-secret,'],
+    'double comma' => ['old-secret,,'],
+    'empty array entry' => [['old-secret', '']],
+    'whitespace-only entry' => [['old-secret', '  ']],
+])->throws(InvalidTokenException::class);

@@ -39,6 +39,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Previous channel token signing secrets
+    |--------------------------------------------------------------------------
+    |
+    | Comma-separated secrets still accepted for token verification while
+    | a secret rotation is in progress. Signing always uses
+    | `signing_secret`; these are never used to issue tokens. Deploy them
+    | to the authorizer before rotating, and remove them once the longest
+    | token TTL has elapsed. Optional.
+    |
+    */
+
+    'previous_signing_secrets' => env('APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS'),
+
+    /*
+    |--------------------------------------------------------------------------
     | AWS region
     |--------------------------------------------------------------------------
     |
