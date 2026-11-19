@@ -1,4 +1,4 @@
-# Laravel AppSync Events
+![Laravel AppSync Events](assets/banner.jpg)
 
 Broadcast Laravel events over **AWS AppSync Event APIs** — managed, serverless WebSocket fan-out — with a matching [Laravel Echo](https://github.com/laravel/echo) 2 connector on the client. The package publishes events with SigV4-signed HTTP calls, authorizes connections and subscriptions through an AppSync Lambda authorizer that verifies HMAC tokens issued by your app, and ships the Echo connector as `@hds-solutions/laravel-echo-appsync`.
 
