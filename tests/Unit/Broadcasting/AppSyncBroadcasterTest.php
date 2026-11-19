@@ -67,6 +67,35 @@ it('sends one signed POST per channel', function (): void {
     expect($bodyB['channel'])->toBe('/orders/public/2');
 });
 
+it('lifts a non-empty payload socket into the event envelope for toOthers()', function (mixed $socket, string $expected): void {
+    $history = [];
+    broadcasterWithMock([new Response(200)], $history)
+        ->broadcast([new Channel('orders')], 'Updated', ['id' => 1, 'socket' => $socket]);
+
+    $message = json_decode(json_decode((string) $history[0]['request']->getBody(), true)['events'][0], true);
+
+    expect($message['socket'])->toBe($expected)
+        ->and($message['data'])->toBe(['id' => 1]);
+})->with([
+    'string socket id' => ['abc', 'abc'],
+    'scalar socket id cast to string' => [123, '123'],
+]);
+
+it('omits the socket envelope field when the payload socket is empty or absent', function (array $payload): void {
+    $history = [];
+    broadcasterWithMock([new Response(200)], $history)
+        ->broadcast([new Channel('orders')], 'Updated', $payload);
+
+    $message = json_decode(json_decode((string) $history[0]['request']->getBody(), true)['events'][0], true);
+
+    expect($message)->not->toHaveKey('socket')
+        ->and($message['data'])->toBe(['id' => 1]);
+})->with([
+    'absent' => [['id' => 1]],
+    'null' => [['id' => 1, 'socket' => null]],
+    'empty string' => [['id' => 1, 'socket' => '']],
+]);
+
 it('signs requests with SigV4 for the endpoint region', function (): void {
     $history = [];
     broadcasterWithMock([new Response(200)], $history)
