@@ -151,12 +151,15 @@ AppSync Events offers five [authorization types](https://docs.aws.amazon.com/app
 
 The package is PHP-strict: your Laravel users and `routes/channels.php` stay the source of truth, so Cognito and OIDC client authentication are out of scope. AppSync lets you set the authorization mode per namespace, so public channels (`API_KEY`) and private channels (`AWS_LAMBDA`) can live side by side on the same Event API.
 
-Your Laravel app can run anywhere — Laravel Vapor, Docker, ECS, a VM. It publishes with the AWS SDK's default credential chain (environment variables, web identity, ECS task role, EC2 instance profile), so on a role-based platform you don't configure any keys; the role only needs `appsync:EventPublish`. It also serves `/broadcasting/auth`, which needs no AWS access.
+Your Laravel app is not tied to a particular host. The broadcaster signs publish requests with the AWS SDK's default credential chain (environment variables, web identity, ECS task role, EC2 instance profile), so wherever your app runs with an IAM role, it should need no keys in config — the role only needs `appsync:EventPublish`. `/broadcasting/auth` needs no AWS access.
 
-- **Laravel Vapor** — your app's Lambda runs under Vapor's `laravel-vapor-role`, whose credentials reach the app through the reserved `AWS_*` variables. Add `appsync:EventPublish` to that role. Vapor manages the role itself, so [disable "Receive updates" on it](https://laravel.com/blog/vapor-customize-default-role) first or your change may be overwritten. Don't set `AWS_*` keys in the environment (Vapor reserves them); set `APPSYNC_REGION` if you don't want to rely on the injected `AWS_DEFAULT_REGION`.
-- **Docker / ECS** — attach the permission to the task role; no keys needed.
+> [!NOTE]
+> The platform notes below come from the platform documentation and the SDK's credential chain; they have **not** been tested on a real Laravel Vapor or ECS deployment. Please verify them in your environment.
 
-The one piece that must run on Lambda is the authorizer below, because AppSync invokes it directly. Vapor deploys your Laravel app's functions, so deploy the authorizer separately (Serverless Framework with Bref, CloudFormation, Terraform or CDK — see [docs/aws-setup.md](docs/aws-setup.md)); it only needs the same `APPSYNC_CHANNEL_SIGNING_SECRET`.
+- **Laravel Vapor** — per Vapor's docs, your app's Lambda runs under the `laravel-vapor-role` role and reserves the `AWS_*` credential and region variables. You will likely need to add `appsync:EventPublish` to that role; Vapor manages it itself, so see Laravel's [Customize Default Role](https://laravel.com/blog/vapor-customize-default-role) post before editing it. Don't set `AWS_*` keys yourself; `APPSYNC_REGION` can override the region.
+- **Docker / ECS** — grant the permission to the task role instead of configuring keys.
+
+The authorizer below is the one piece AppSync invokes directly, so it must run on Lambda. As far as we know Vapor only deploys your Laravel app's own functions, so plan to deploy the authorizer with another tool (Serverless Framework with Bref, CloudFormation, Terraform or CDK — see [docs/aws-setup.md](docs/aws-setup.md)); it only needs the same `APPSYNC_CHANNEL_SIGNING_SECRET`.
 
 ## The Lambda authorizer
 
