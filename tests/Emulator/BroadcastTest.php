@@ -59,8 +59,9 @@ it('delivers a public broadcast to an API-key subscriber', function (): void {
 
         $line = $subscriber->waitFor('event', static fn (array $l): bool => $l['channel'] === 'orders.pub-1');
 
-        // `/orders/public/pub-1` proves the channel path mapping is what
-        // the emulator routed: namespace `orders`, type segment `public`.
+        // `/public/orders/pub-1` proves the channel path mapping is what
+        // the emulator routed: the `public` namespace, then the name
+        // segments.
         expect($line['data'])->toBe(['order' => 7]);
     } finally {
         $subscriber->close();

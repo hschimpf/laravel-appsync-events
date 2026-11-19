@@ -35,7 +35,7 @@ describe('connector against the emulator', () => {
 
         await waitFor(() => subscribed.mock.calls.length > 0, 10_000, 'subscribe_success');
 
-        await publishEvent(api, '/orders/public/js-pub', 'JsShipped', { order: 1 });
+        await publishEvent(api, '/public/orders/js-pub', 'JsShipped', { order: 1 });
         await waitFor(() => received.length > 0, 10_000, 'data frame');
 
         expect(received).toEqual([{ order: 1 }]);
@@ -64,7 +64,7 @@ describe('connector against the emulator', () => {
         expect(connectToken).toHaveBeenCalled();
         expect(authorizer).toHaveBeenCalledWith('private-orders.js-priv', connector.socketId());
 
-        await publishEvent(api, '/orders/private/js-priv', 'JsPriv', { order: 2 });
+        await publishEvent(api, '/private/orders/js-priv', 'JsPriv', { order: 2 });
         await waitFor(() => received.length > 0, 10_000, 'data frame');
 
         expect(received).toEqual([{ order: 2 }]);
@@ -84,16 +84,16 @@ describe('connector against the emulator', () => {
         channel.subscribed(subscribed).listen('.Multi', a).listen('.Multi', b);
 
         await waitFor(() => subscribed.mock.calls.length > 0, 10_000, 'subscribe_success');
-        await publishEvent(api, '/orders/public/js-multi', 'Multi', 1);
+        await publishEvent(api, '/public/orders/js-multi', 'Multi', 1);
         await waitFor(() => a.mock.calls.length > 0 && b.mock.calls.length > 0, 10_000, 'both listeners');
 
         channel.stopListening('.Multi', a);
-        await publishEvent(api, '/orders/public/js-multi', 'Multi', 2);
+        await publishEvent(api, '/public/orders/js-multi', 'Multi', 2);
         await waitFor(() => b.mock.calls.length === 2, 10_000, 'second event on b');
         expect(a).toHaveBeenCalledTimes(1);
 
         channel.stopListening('.Multi');
-        await publishEvent(api, '/orders/public/js-multi', 'Multi', 3);
+        await publishEvent(api, '/public/orders/js-multi', 'Multi', 3);
         await new Promise((resolve) => setTimeout(resolve, 500));
         expect(b).toHaveBeenCalledTimes(2);
 
@@ -110,12 +110,12 @@ describe('connector against the emulator', () => {
         connector.channel('orders.js-leave').subscribed(subscribed).listen('.Leave', (p: unknown) => received.push(p));
 
         await waitFor(() => subscribed.mock.calls.length > 0, 10_000, 'subscribe_success');
-        await publishEvent(api, '/orders/public/js-leave', 'Leave', 1);
+        await publishEvent(api, '/public/orders/js-leave', 'Leave', 1);
         await waitFor(() => received.length > 0, 10_000, 'first event');
 
         connector.leave('orders.js-leave');
 
-        await publishEvent(api, '/orders/public/js-leave', 'Leave', 2);
+        await publishEvent(api, '/public/orders/js-leave', 'Leave', 2);
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         expect(received).toEqual([1]);
@@ -126,10 +126,11 @@ describe('connector against the emulator', () => {
     emulatorIt('surfaces subscribe_error for an unknown namespace without crashing', async (api) => {
         const connector = new AppSyncConnector(options(api.realtimeEndpoint, api.httpHost, {
             publicApiKey: api.apiKey,
+            publicNamespace: 'ghost',
         }));
 
         const errors: unknown[] = [];
-        connector.channel('ghost.ns-1').error((error: unknown) => errors.push(error));
+        connector.channel('ns-1').error((error: unknown) => errors.push(error));
 
         const error = await waitFor(
             () => errors.at(-1),
@@ -158,7 +159,7 @@ describe('connector against the emulator', () => {
 
         await waitFor(() => subscribed.mock.calls.length === 2, 10_000, 're-subscribe_success');
 
-        await publishEvent(api, '/orders/public/js-re', 'Re', { again: true });
+        await publishEvent(api, '/public/orders/js-re', 'Re', { again: true });
         await waitFor(() => received.length > 0, 10_000, 'event after reconnect');
 
         expect(received).toEqual([{ again: true }]);

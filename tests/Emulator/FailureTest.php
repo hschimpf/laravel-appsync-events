@@ -21,16 +21,17 @@ it('fails publishing to a channel whose namespace does not exist', function (): 
         signer: new TokenSigner(EmulatorSuite::SIGNING_SECRET),
         httpEndpoint: $this->api->httpEndpoint,
         region: 'us-east-1',
+        publicNamespace: 'ghost',
         credentialProvider: new Credentials('emulator-akid', 'emulator-secret'),
     );
 
     try {
-        $broadcaster->broadcast([new Channel('ghost.1')], 'Boo', []);
+        $broadcaster->broadcast([new Channel('boo.1')], 'Boo', []);
         $this->fail('Expected BroadcastException');
     } catch (BroadcastException $exception) {
         // The emulator answers 404 NotFoundException for unknown namespaces.
         expect($exception->getMessage())
-            ->toContain('/ghost/public/1')
+            ->toContain('/ghost/boo/1')
             ->toContain('404');
     }
 });
@@ -48,7 +49,7 @@ it('fails publishing to an unreachable endpoint', function (): void {
         $broadcaster->broadcast([new Channel('orders.1')], 'Boo', []);
         $this->fail('Expected BroadcastException');
     } catch (BroadcastException $exception) {
-        expect($exception->getMessage())->toContain('/orders/public/1');
+        expect($exception->getMessage())->toContain('/public/orders/1');
     }
 });
 
@@ -74,14 +75,14 @@ it('verifies issued subscribe tokens against the channel path (contract check)',
 
     $authorized = $authorizer->authorize([
         'authorizationToken' => $token,
-        'requestContext' => ['operation' => 'EVENT_SUBSCRIBE', 'channel' => '/orders/private/9'],
+        'requestContext' => ['operation' => 'EVENT_SUBSCRIBE', 'channel' => '/private/orders/9'],
     ]);
     expect($authorized['isAuthorized'])->toBeTrue()
         ->and($authorized['handlerContext']['uid'])->toBe('7');
 
     $wrongChannel = $authorizer->authorize([
         'authorizationToken' => $token,
-        'requestContext' => ['operation' => 'EVENT_SUBSCRIBE', 'channel' => '/orders/private/10'],
+        'requestContext' => ['operation' => 'EVENT_SUBSCRIBE', 'channel' => '/private/orders/10'],
     ]);
     expect($wrongChannel['isAuthorized'])->toBeFalse()
         ->and($wrongChannel['ttlOverride'])->toBe(0);

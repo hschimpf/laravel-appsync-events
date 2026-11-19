@@ -9,7 +9,8 @@
  *   httpHost         host[:port] for handshake/subscribe authorization
  *   connectToken?    token sent as Authorization in the handshake
  *   publicApiKey?    x-api-key for handshake + public subscriptions
- *   defaultNamespace? channel namespace for dotless channel names
+ *   publicNamespace?  namespace for public channels (default 'public')
+ *   privateNamespace? namespace for private- channels (default 'private')
  *   subscribeTokens? map of wire channel name → token, served by a custom
  *                    `authorizer` (the emulator does not validate it)
  *   channels         [{name: 'private-orders.1'|'orders.1', event: '.OrderShipped'}]
@@ -30,7 +31,8 @@ const connector = new AppSyncConnector({
     httpHost: config.httpHost,
     connectToken: config.connectToken,
     publicApiKey: config.publicApiKey,
-    defaultNamespace: config.defaultNamespace,
+    publicNamespace: config.publicNamespace,
+    privateNamespace: config.privateNamespace,
     authorizer: async (channelName) => config.subscribeTokens?.[channelName] ?? 'emulator-subscribe-token',
 });
 
