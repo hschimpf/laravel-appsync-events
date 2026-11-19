@@ -22,8 +22,8 @@ use HDSSolutions\Laravel\AppSyncEvents\Auth\TokenSigner;
  *  - `EVENT_CONNECT` requires a verified token with purpose `connect`,
  *    not expired.
  *  - `EVENT_SUBSCRIBE` requires a verified token with purpose `subscribe`,
- *    not expired, whose `channel` claim equals the channel the client is
- *    subscribing to (`requestContext.channel`).
+ *    not expired, whose `channel` claim is a non-empty string equal to the
+ *    channel the client is subscribing to (`requestContext.channel`).
  *  - `EVENT_PUBLISH` and any unknown operation are always denied —
  *    publishing is a server-side concern performed with IAM credentials,
  *    never with these tokens.
@@ -84,7 +84,9 @@ final class AppSyncAuthorizer
                         && self::isNotExpired($claims),
                     'EVENT_SUBSCRIBE' => ($claims['purpose'] ?? null) === 'subscribe'
                         && self::isNotExpired($claims)
-                        && $channel === ($claims['channel'] ?? null),
+                        && is_string($claims['channel'] ?? null)
+                        && $claims['channel'] !== ''
+                        && $channel === $claims['channel'],
                     default => false,
                 };
             }

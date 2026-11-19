@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   envelope socket matches its own `socketId()`. AppSync has no
   server-side sender exclusion, so this is client-side filtering.
 
+### Changed
+
+- **Subscribe tokens must carry a `channel` claim** — `AppSyncAuthorizer`
+  now denies `EVENT_SUBSCRIBE` unless the token has a non-empty string
+  `channel` claim equal to the requested channel. Tokens issued by this
+  package always include it.
+
 ## [0.1.2] - 2026-11-18
 
 ### Fixed

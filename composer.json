@@ -44,6 +44,9 @@
         "pestphp/pest": "^3.0|^4.0|^5.0",
         "pestphp/pest-plugin-laravel": "^3.0|^4.0|^5.0"
     },
+    "suggest": {
+        "bref/bref": "Run the Lambda authorizer on PHP with Bref (https://bref.sh)"
+    },
     "autoload": {
         "psr-4": {
             "HDSSolutions\\Laravel\\AppSyncEvents\\": "src/"
