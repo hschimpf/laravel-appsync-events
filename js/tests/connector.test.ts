@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { InvalidChannelNameError } from '../src/channelPath.js';
 import { AppSyncConnector } from '../src/connector.js';
 import type { AppSyncConnectorOptions } from '../src/options.js';
 import type { AuthErrorEvent } from '../src/protocol.js';
@@ -433,7 +434,7 @@ describe('subscriptions', () => {
         expect(connector.channel('private-orders.1')).not.toBe(channel); // recreated
     });
 
-    it('leaves public, private and presence variants without throwing', async () => {
+    it('leaves public and private variants without throwing', async () => {
         const { connector } = makeConnector();
         await connectAndAck(connector);
 
@@ -449,7 +450,25 @@ describe('subscriptions', () => {
         const { connector } = makeConnector();
 
         expect(() => connector.presenceChannel('room.1'))
-            .toThrow('Presence channels are not supported by the AppSync connector yet');
+            .toThrow('Presence channels are not supported by the AppSync connector');
+    });
+
+    it('rejects presence- names in the subscribe path like other invalid names', async () => {
+        const { connector } = makeConnector();
+
+        // channel() auto-subscribes; while unconnected the channel stays
+        // pending and doSubscribe() — where toAppSyncChannel() runs —
+        // never fires, so drive it the way flushPendingChannels() would.
+        // InvalidChannelNameError rejects the async subscribe the same
+        // way for every invalid name, presence- included.
+        for (const name of ['presence-room.5', 'orders.*']) {
+            const channel = connector.channel(name);
+            const subscribe = (connector as unknown as {
+                doSubscribe: (c: typeof channel) => Promise<void>;
+            }).doSubscribe(channel);
+
+            await expect(subscribe).rejects.toThrow(InvalidChannelNameError);
+        }
     });
 });
 

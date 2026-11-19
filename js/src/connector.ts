@@ -265,10 +265,10 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
      * Get a presence channel instance by name.
      *
      * @param channel - The channel name.
-     * @throws Always — presence channels are not supported yet.
+     * @throws Always — presence channels are not supported by this package.
      */
     public presenceChannel(channel: string): PresenceChannel {
-        throw new Error('Presence channels are not supported by the AppSync connector yet');
+        throw new Error('Presence channels are not supported by the AppSync connector');
     }
 
     /**
@@ -283,13 +283,12 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
     }
 
     /**
-     * Leave the given channel, as well as its private and presence
-     * variants.
+     * Leave the given channel, as well as its private variant.
      *
      * @param channel - The channel name without any type prefix.
      */
     public leave(channel: string): void {
-        for (const prefix of ['', 'private-', 'presence-']) {
+        for (const prefix of ['', 'private-']) {
             this.leaveChannel(prefix + channel);
         }
     }
@@ -571,7 +570,7 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
         // connection drops while its authorization is in flight.
         this.subscriptions.set(channel.subscriptionId, channel);
 
-        if (channel.name.startsWith('private-') || channel.name.startsWith('presence-')) {
+        if (channel.name.startsWith('private-')) {
             try {
                 authorization.Authorization = await this.authorizeChannel(channel.name);
             } catch (error) {

@@ -16,6 +16,7 @@ use HDSSolutions\Laravel\AppSyncEvents\Broadcasting\AppSyncBroadcaster;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -156,6 +157,12 @@ it('wraps connection errors in a BroadcastException with the previous', function
             ->and($e->getMessage())->toContain('/default/public/orders');
     }
 });
+
+it('rejects broadcasting to a presence channel like any invalid name', function (): void {
+    $history = [];
+    broadcasterWithMock([], $history)
+        ->broadcast([new PresenceChannel('room.5')], 'Updated', []);
+})->throws(InvalidArgumentException::class, 'presence channels (presence- prefix) are not supported');
 
 it('sends no request for an empty channel list', function (): void {
     $history = [];

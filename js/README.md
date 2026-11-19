@@ -61,7 +61,8 @@ Unknown options pass through to Echo.
 ## Behavior notes
 
 - `echo.private('orders.1')` and `echo.channel('orders.1')` work as usual;
-  `echo.join()` (presence) throws — presence channels aren't supported.
+  `echo.join()` (presence) throws — presence channels aren't supported,
+  and `presence-` channel names are rejected (`InvalidChannelNameError`).
 - Channel names map to AppSync paths like the PHP side:
   `private-orders.1` → `/orders/private/1`.
 - `disconnect()` stops reconnects; `connect()` re-subscribes every pending
