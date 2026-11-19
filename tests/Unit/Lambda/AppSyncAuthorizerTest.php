@@ -66,6 +66,23 @@ it('denies a subscribe token for a different channel', function (): void {
     expect($result['isAuthorized'])->toBeFalse();
 });
 
+it('denies a subscribe token without a channel claim', function (?string $channel): void {
+    $token = (new TokenSigner(AUTHORIZER_SECRET))->sign([
+        'purpose' => 'subscribe',
+        'uid' => 'user-9',
+        'exp' => time() + 300,
+    ]);
+
+    $result = (new AppSyncAuthorizer(AUTHORIZER_SECRET))
+        ->authorize(authorizerEvent('EVENT_SUBSCRIBE', $token, $channel));
+
+    expect($result['isAuthorized'])->toBeFalse()
+        ->and($result['ttlOverride'])->toBe(0);
+})->with([
+    'channel requested' => ['/default/private/chat'],
+    'no channel requested' => [null],
+]);
+
 it('denies a connect token for EVENT_SUBSCRIBE', function (): void {
     $token = (new TokenSigner(AUTHORIZER_SECRET))->connectToken('user-1');
 
