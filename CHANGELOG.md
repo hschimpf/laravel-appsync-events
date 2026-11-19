@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leaking it into `data`, and the Echo connector drops events whose
   envelope socket matches its own `socketId()`. AppSync has no
   server-side sender exclusion, so this is client-side filtering.
+- **Signing-secret rotation** — `previous_signing_secrets`
+  (`APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS`, comma-separated) lists
+  outgoing secrets that `TokenSigner`/`AppSyncAuthorizer` still accept
+  for verification; signing always uses the current `signing_secret`.
+  Deploy the authorizer first, rotate the app secret, then drop the
+  previous list after the longest token TTL for zero-downtime rotation.
 
 ### Changed
 
