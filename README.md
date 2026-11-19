@@ -373,6 +373,12 @@ new Echo(appSyncEchoOptions({
 }));
 ```
 
+## Broadcasting to others
+
+`broadcast(new OrderShipped($order))->toOthers()` is supported: the sender's socket id (the `X-Socket-ID` header Echo attaches to the request that triggered the broadcast) is lifted out of the event data into a `socket` field on the published event envelope, and the Echo connector drops any event whose envelope socket matches its own `socketId()`.
+
+This is client-side filtering — AppSync has no server-side sender exclusion, so other connectors or raw subscribers still receive the event.
+
 ## Channel names and AppSync channel paths
 
 Laravel channel names map to AppSync channel paths `/{namespace}/{type}/{segment}` — the mapping is identical in PHP (`ChannelPath`) and TS (`toAppSyncChannel`), verified against a shared fixture:
