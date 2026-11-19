@@ -479,6 +479,57 @@ describe('event dispatch', () => {
         expect(received).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
     });
 
+    it('drops events whose envelope socket matches our own socketId (toOthers)', async () => {
+        const { connector } = makeConnector();
+        const socket = await connectAndAck(connector);
+
+        const received = vi.fn();
+        const channel = connector.channel('orders.1').listen('.Shipped', received);
+        await tick();
+
+        socket.serverSend({
+            type: 'data',
+            id: channel.subscriptionId,
+            event: JSON.stringify({ event: 'Shipped', data: { id: 1 }, socket: connector.socketId() }),
+        });
+
+        expect(received).not.toHaveBeenCalled();
+    });
+
+    it('delivers events whose envelope socket is a different socket id', async () => {
+        const { connector } = makeConnector();
+        const socket = await connectAndAck(connector);
+
+        const received = vi.fn();
+        const channel = connector.channel('orders.1').listen('.Shipped', received);
+        await tick();
+
+        socket.serverSend({
+            type: 'data',
+            id: channel.subscriptionId,
+            event: JSON.stringify({ event: 'Shipped', data: { id: 1 }, socket: 'someone-else' }),
+        });
+
+        expect(received).toHaveBeenCalledWith({ id: 1 });
+    });
+
+    it('delivers events without a socket envelope field', async () => {
+        const { connector } = makeConnector();
+        const socket = await connectAndAck(connector);
+
+        const received = vi.fn();
+        const channel = connector.channel('orders.1').listen('.Shipped', received);
+        await tick();
+
+        socket.serverSend({
+            type: 'data',
+            id: channel.subscriptionId,
+            event: JSON.stringify({ event: 'Shipped', data: { id: 1 } }),
+        });
+
+        expect(received).toHaveBeenCalledWith({ id: 1 });
+    });
+
     it('applies the Echo event namespace and supports multiple listeners', async () => {
         const { connector } = makeConnector();
         const socket = await connectAndAck(connector);

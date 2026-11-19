@@ -476,7 +476,10 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
 
     /**
      * Dispatch a `data` frame: `event` may be a JSON string or an array
-     * of JSON strings of `{event, data}`; malformed items are ignored.
+     * of JSON strings of `{event, data, socket?}`; malformed items are
+     * ignored. An envelope `socket` matching our own {@link socketId}
+     * marks an event published with `->toOthers()`, so it is dropped —
+     * AppSync has no server-side sender exclusion.
      *
      * @param message - The parsed `data` frame.
      */
@@ -485,7 +488,13 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
 
         for (const item of events) {
             try {
-                const payload = JSON.parse(item as string) as { event: string; data: unknown };
+                const payload = JSON.parse(item as string) as { event: string; data: unknown; socket?: string };
+
+                if (typeof payload.socket === 'string' && payload.socket === this.socketId()) {
+                    this.debug('skipping event from own socket', payload.event);
+                    continue;
+                }
+
                 this.subscriptions.get(message.id)?.emit(payload.event, payload.data);
             } catch (error) {
                 this.debug('invalid event payload', item, error);
