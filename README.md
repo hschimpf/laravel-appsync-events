@@ -421,14 +421,12 @@ npm --prefix js test   # Vitest
 
 Emulator tests, fixture conventions and the PR checklist live in [CONTRIBUTING.md](CONTRIBUTING.md); security reports go through [SECURITY.md](SECURITY.md).
 
-## Limitations and roadmap
+## Limitations
 
 - **No presence channels** — `echo.join()` / `presenceChannel()` throws; presence metadata has no AppSync Events equivalent.
 - **No client events / whispers** — clients cannot publish by design.
 - **One Echo connector instance per socket** — the connector multiplexes channels over a single AppSync WebSocket; concurrent reconnects reuse the latest connect generation only.
 - **Emulator caveats** — see [tests/emulator/README.md](tests/emulator/README.md).
-
-Roadmap: presence-channel emulation, `clientConfig()` token-refresh endpoint variants, first-party JS framework adapters.
 
 ## Versioning and license
 
