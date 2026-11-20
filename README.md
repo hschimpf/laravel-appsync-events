@@ -8,7 +8,7 @@ Broadcast Laravel events over **AWS AppSync Event APIs** — managed, serverless
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 > [!WARNING]
-> **This package is in beta.** The API may change between releases — pin an exact version in `composer.json`/`package.json` and check the changelog before upgrading.
+> **This package is in beta.** The API may change between releases — pin an exact version in `composer.json`/`package.json` and check the [changelog](CHANGELOG.md) before upgrading. Found a bug or rough edge? [Report it on GitHub](https://github.com/hschimpf/laravel-appsync-events/issues).
 
 ## What it is
 
