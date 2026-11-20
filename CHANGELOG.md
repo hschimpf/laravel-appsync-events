@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-19
+
+This release reworks how Laravel channel names map to AppSync channel paths
+and contains **several breaking changes** (see _Changed_ and the migration
+steps below). Review them before upgrading — the PHP package and the
+`@hds-solutions/laravel-echo-appsync` connector must be upgraded together,
+since both sides must agree on the channel path.
+
 ### Added
 
 - **`->toOthers()` sender exclusion** — the broadcaster lifts the payload's
@@ -21,6 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for verification; signing always uses the current `signing_secret`.
   Deploy the authorizer first, rotate the app secret, then drop the
   previous list after the longest token TTL for zero-downtime rotation.
+- **Configurable channel namespaces** — new `namespaces.public` /
+  `namespaces.private` config keys (`APPSYNC_PUBLIC_NAMESPACE` /
+  `APPSYNC_PRIVATE_NAMESPACE`, both default to `public` / `private`), and
+  matching `publicNamespace` / `privateNamespace` connector options, now
+  returned by `AppSyncEvents::clientConfig()`.
+- **Authorization types and platform notes in the README** — a table
+  comparing AppSync auth types against what the package supports, plus notes
+  on how Vapor, Docker and ECS apps obtain publish credentials and where the
+  Lambda authorizer must be deployed (derived from platform docs, not tested
+  on real Vapor/ECS deployments).
+- **`bref/bref` suggestion** — added to `composer.json` `suggest` for running
+  the Lambda authorizer.
+- **README banner image.**
 
 ### Changed
 
@@ -64,6 +85,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     4. Re-scope `appsync:EventPublish` IAM statements to the two
        `channelNamespace/{public,private}` ARNs — per-domain namespace
        isolation is gone.
+    5. Update any subscriber or handler that hard-codes an old channel
+       path, and redeploy the Lambda authorizer and the Echo connector
+       together with the app.
+- **JS connector only authorizes `private-` channels** — `presence-` handling
+  was dropped from `AppSyncConnector`, and `presenceChannel()` no longer
+  claims presence support is coming.
+- **Infrastructure templates and docs updated** — the CDK, CloudFormation,
+  Serverless and Terraform examples, `docs/aws-setup.md`, `README.md`,
+  `js/README.md` and `CONTRIBUTING.md` now describe the `public` / `private`
+  namespaces, signing-secret rotation and the new channel mapping.
+- The README "Roadmap" section was removed.
+
+### Fixed
+
+- **Subscribe token without a `channel` claim authorized any channel-less
+  request** (security) — a token lacking a `channel` claim matched a request
+  that also carried no channel (`null === null`); `EVENT_SUBSCRIBE` now
+  requires a non-empty string claim equal to the requested channel.
+- **Channel-path collisions** — mapping dots to path separators (see
+  _Changed_) removes the collision between `orders.1.items` and
+  `orders.1-items`, which previously let one channel's subscribe token
+  authorize the other.
+
+### Development
+
+- Shared PHP/TypeScript channel-path fixture, unit tests and emulator
+  integration tests rewritten for the type-as-namespace mapping and
+  provisioning of the `public` / `private` namespaces.
+- Bumped `@aws-sdk/client-appsync` dev dependency to 3.1169.0.
 
 ## [0.1.2] - 2026-11-18
 
@@ -131,7 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CI** — PHP 8.2–8.5 tests, lint and static analysis; Node 22/24 JS
   typecheck, build and tests.
 
-[Unreleased]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/hschimpf/laravel-appsync-events/releases/tag/v0.1.0
