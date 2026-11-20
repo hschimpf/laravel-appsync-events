@@ -7,6 +7,9 @@ Broadcast Laravel events over **AWS AppSync Event APIs** — managed, serverless
 [![npm Version](https://img.shields.io/npm/v/@hds-solutions/laravel-echo-appsync.svg)](https://www.npmjs.com/package/@hds-solutions/laravel-echo-appsync)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+> [!WARNING]
+> **This package is in beta.** The API may change between releases — pin an exact version in `composer.json`/`package.json` and check the changelog before upgrading.
+
 ## What it is
 
 AWS AppSync [Event APIs](https://docs.aws.amazon.com/appsync/latest/eventapi/event-api-concepts.html) give you a managed WebSocket endpoint: AWS holds the sockets, routes published events to channel subscribers, and scales the fan-out for you. This package plugs that into Laravel's broadcasting layer — `ShouldBroadcast` events, `routes/channels.php` authorization, `Broadcast::channel()` — so you get realtime delivery **without running Reverb, Pusher, or any WebSocket server of your own**.
