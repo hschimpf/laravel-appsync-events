@@ -1,37 +1,29 @@
 /**
  * Maps a Laravel broadcasting channel name to an AWS AppSync Events
- * channel path of the form `/{namespace}/{type}/{segment}`.
+ * channel path of the form `/{namespace}/{segment}`.
  *
- * `{type}` is `private` or `public`, taken from the Laravel/Echo channel
- * prefix (`private-`, `private-encrypted-` or none). Presence channels
- * are out of scope for this package: a name starting with `presence-` is
- * rejected with an {@link InvalidChannelNameError}. The rest of the name
- * is split on `.`: the first part becomes the AppSync channel namespace
- * (falling back to the default namespace when there is no dot) and each
- * remaining part becomes a path segment. Dashes stay literal, so
- * `orders.1.items` (`/orders/public/1/items`) and `orders.1-items`
- * (`/orders/public/1-items`) are different channels.
+ * `{namespace}` is the public or private namespace, taken from the
+ * Laravel/Echo channel prefix (`private-` or none). Namespaces are the
+ * AppSync authorization boundary, so the channel type is mapped onto
+ * them directly. `private-encrypted-` channels are rejected because
+ * payload encryption is not implemented by this package, and presence
+ * channels are out of scope: a name starting with `presence-` is
+ * rejected with an {@link InvalidChannelNameError} as well. The rest of
+ * the name is split on `.` and each part becomes a path segment. Dashes
+ * stay literal, so `orders.1.items` (`/public/orders/1/items`) and
+ * `orders.1-items` (`/public/orders/1-items`) are different channels.
  *
  * AppSync channel paths are limited to 1–5 segments, each 1–50
  * characters alphanumeric with interior dashes (`[A-Za-z0-9-]`, no
  * underscores).
  *
  * This mirrors `HDSSolutions\Laravel\AppSyncEvents\Support\ChannelPath`
- * in the PHP package — including the `presence-` rejection; both
- * implementations are verified against the same fixture
+ * in the PHP package — including the `presence-` and `private-encrypted-`
+ * rejections; both implementations are verified against the same fixture
  * (`tests/fixtures/channel-paths.json`).
  */
 
 const SEGMENT_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,48}[A-Za-z0-9])?$/;
-
-/**
- * The channel prefixes that mark guarded Laravel channels, longest first
- * so `private-encrypted-` wins over `private-`.
- */
-const TYPES: ReadonlyArray<readonly [prefix: string, type: 'private']> = [
-    ['private-encrypted-', 'private'],
-    ['private-', 'private'],
-];
 
 /**
  * Thrown when a Laravel channel name cannot be mapped to a valid AppSync
@@ -52,16 +44,29 @@ export class InvalidChannelNameError extends Error {
  *
  * @param channelName - The channel name as it appears on the wire
  *     (e.g. `private-orders.1`, `orders`).
- * @param defaultNamespace - The AppSync namespace used when the name
- *     carries no `.`-separated namespace part.
- * @returns The channel path `/{namespace}/{type}/{segment}`.
+ * @param publicNamespace - The AppSync namespace for public channels.
+ * @param privateNamespace - The AppSync namespace for private channels.
+ * @returns The channel path `/{namespace}/{segment}`.
  *
- * @throws {@link InvalidChannelNameError} When the name is a presence
- *     channel, would exceed five path segments, or would produce an
- *     invalid segment (empty, over 50 characters, or characters outside
- *     `[A-Za-z0-9-]`).
+ * @throws {@link InvalidChannelNameError} When the namespaces are invalid
+ *     or equal, the name is a presence or private-encrypted channel, would
+ *     exceed five path segments, or would produce an invalid segment
+ *     (empty, over 50 characters, or characters outside `[A-Za-z0-9-]`).
  */
-export function toAppSyncChannel(channelName: string, defaultNamespace = 'default'): string {
+export function toAppSyncChannel(
+    channelName: string,
+    publicNamespace = 'public',
+    privateNamespace = 'private',
+): string {
+    assertNamespace(publicNamespace, 'public');
+    assertNamespace(privateNamespace, 'private');
+
+    if (publicNamespace === privateNamespace) {
+        throw new InvalidChannelNameError(
+            `The public and private namespaces must differ: both are "${publicNamespace}".`,
+        );
+    }
+
     if (channelName.startsWith('presence-')) {
         throw new InvalidChannelNameError(
             `Channel name "${channelName}" is not supported: ` +
@@ -69,44 +74,57 @@ export function toAppSyncChannel(channelName: string, defaultNamespace = 'defaul
         );
     }
 
-    let type: 'private' | 'public' = 'public';
-    let name = channelName;
-
-    for (const [prefix, prefixType] of TYPES) {
-        if (channelName.startsWith(prefix)) {
-            type = prefixType;
-            name = channelName.slice(prefix.length);
-            break;
-        }
-    }
-
-    let namespace: string;
-    let segments: string[];
-
-    if (name.includes('.')) {
-        const parts = name.split('.');
-        namespace = parts.shift() as string;
-        segments = parts;
-    } else {
-        namespace = defaultNamespace;
-        segments = [name];
-    }
-
-    if (segments.length > 3) {
+    if (channelName.startsWith('private-encrypted-')) {
         throw new InvalidChannelNameError(
-            `Channel name "${channelName}" produces too many AppSync channel path segments: ` +
-            `${segments.length + 2} exceeds the limit of 5 segments ` +
-            '(namespace, type and at most 3 name segments).',
+            `Channel name "${channelName}" is not supported: ` +
+            'payload encryption is not implemented by this package, ' +
+            'so private-encrypted channels are not supported (use private-).',
         );
     }
 
-    assertSegment(namespace, 'namespace', channelName);
+    let namespace: string;
+    let name: string;
+
+    if (channelName.startsWith('private-')) {
+        namespace = privateNamespace;
+        name = channelName.slice('private-'.length);
+    } else {
+        namespace = publicNamespace;
+        name = channelName;
+    }
+
+    const segments = name.split('.');
+
+    if (segments.length > 4) {
+        throw new InvalidChannelNameError(
+            `Channel name "${channelName}" produces too many AppSync channel path segments: ` +
+            `${segments.length + 1} exceeds the limit of 5 segments ` +
+            '(namespace and at most 4 channel name segments).',
+        );
+    }
 
     for (const segment of segments) {
         assertSegment(segment, 'channel', channelName);
     }
 
-    return `/${namespace}/${type}/${segments.join('/')}`;
+    return `/${namespace}/${segments.join('/')}`;
+}
+
+/**
+ * Ensure a configured namespace is a valid AppSync path segment.
+ *
+ * @param namespace - The namespace to validate.
+ * @param kind - Which namespace it is, for the error message.
+ * @throws {@link InvalidChannelNameError} When the namespace is malformed.
+ */
+function assertNamespace(namespace: string, kind: string): void {
+    if (!SEGMENT_PATTERN.test(namespace)) {
+        throw new InvalidChannelNameError(
+            `The ${kind} namespace "${namespace}" is not a valid AppSync channel namespace: ` +
+            'it must be 1–50 characters, alphanumeric at both ends ' +
+            'with dashes allowed inside ([A-Za-z0-9-]).',
+        );
+    }
 }
 
 /**

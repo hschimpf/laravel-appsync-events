@@ -116,7 +116,7 @@ stricter.
   `api.dns.HTTP` / `api.dns.REALTIME` as `127.0.0.1:<port>` — one port per
   endpoint, allocated from `EMULATOR_LISTENER_PORT_RANGE` (OS-ephemeral
   otherwise).
-- `CreateChannelNamespace` (`default`, `private`) and `CreateApiKey` work
+- `CreateChannelNamespace` (`public`, `private`) and `CreateApiKey` work
   as documented; the returned `apiKey.id` (`da2-…`) is the value clients
   send as `x-api-key`.
 - The control plane verifies SigV4 strictly: an unsigned request is
@@ -126,7 +126,7 @@ stricter.
 ### HTTP publish endpoint (`<dns.HTTP>/event`)
 
 - `POST http://<dns.HTTP>/event` with `x-api-key: <key>` and body
-  `{"channel":"/default/test","events":["{\"hello\":1}"]}` →
+  `{"channel":"/public/test","events":["{\"hello\":1}"]}` →
   `200 {"failed":[],"successful":[{"identifier":"…","index":0}]}`.
 - A SigV4-signed request (service `appsync`, region `us-east-1`, emulator
   credentials) → `200`. **The signature is not verified**: an
@@ -157,7 +157,7 @@ stricter.
 - `subscribe` → `{"type":"subscribe_success","id":"…"}`. Both a wrong
   `host` inside `authorization` and a *missing* `authorization` object
   still succeed — subscribe authorization is lenient.
-- Subscribing to `/default`, `/private/test`, `/default/a/b/c`
+- Subscribing to `/public`, `/private/test`, `/public/a/b/c`
   (multi-segment) all succeed.
 - Publishing via the HTTP endpoint then delivers
   `{"type":"data","id":"<sub-id>","event":"<the event string>"}` on the

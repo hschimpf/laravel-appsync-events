@@ -156,7 +156,7 @@ export function emulatorApi(): Promise<EmulatorEventApi | null> {
         const apiId = api.api?.apiId ?? '';
         const key = await client.send(new CreateApiKeyCommand({ apiId }));
 
-        for (const namespace of ['orders', 'default', 'notify']) {
+        for (const namespace of ['public', 'private']) {
             await client.send(new CreateChannelNamespaceCommand({ apiId, name: namespace }));
         }
 

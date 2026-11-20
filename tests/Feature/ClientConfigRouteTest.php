@@ -44,7 +44,8 @@ final class ClientConfigRouteTest extends ClientConfigRouteTestCase
             'httpHost',
             'connectToken',
             'authEndpoint',
-            'defaultNamespace',
+            'publicNamespace',
+            'privateNamespace',
             'inactivityTimeout',
         ]);
 

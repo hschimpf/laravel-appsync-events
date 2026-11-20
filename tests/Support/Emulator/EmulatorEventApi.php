@@ -117,7 +117,7 @@ final class EmulatorEventApi
     /**
      * Create a channel namespace on this API.
      *
-     * @param  string  $name  The namespace name (e.g. `orders`, `default`).
+     * @param  string  $name  The namespace name (e.g. `public`, `private`).
      * @param  array<int, array{authType: string}>|null  $publishAuthModes  Optional
      *                                                                      publish auth mode override.
      * @param  array<int, array{authType: string}>|null  $subscribeAuthModes  Optional

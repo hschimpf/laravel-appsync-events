@@ -10,7 +10,7 @@ Framework fragment, Terraform and CDK.
 | Component | Responsibility |
 | --- | --- |
 | AppSync **Event API** | Managed WebSocket endpoint; routes published events to subscribers. |
-| **Channel namespaces** | First-level routing prefixes inside the API (e.g. `orders`, `default`). |
+| **Channel namespaces** | The authorization boundary inside the API — `public` and `private` (configurable). |
 | **Lambda authorizer** | Verifies the HMAC connect/subscribe tokens the Laravel app issues. |
 | **IAM role + policy** | Lets your Laravel servers `appsync:EventPublish` to the namespaces. |
 
@@ -37,14 +37,17 @@ with this auth configuration:
 
 ## 2. Create channel namespaces
 
-The first dot-separated segment of a Laravel channel name becomes the AppSync
-namespace; dotless names use `appsync-events.default_namespace` (default
-`default`). Create one
-[Channel Namespace](https://docs.aws.amazon.com/appsync/latest/eventapi/event-api-concepts.html#channel-namespaces)
-per prefix your channels use, for example:
+Channel names map to `/{namespace}/{segment…}` paths where the namespace is
+the AppSync authorization boundary: `private-` channels resolve under the
+private namespace, everything else under the public namespace. Create two
+[Channel Namespaces](https://docs.aws.amazon.com/appsync/latest/eventapi/event-api-concepts.html#channel-namespaces)
+matching your `appsync-events.namespaces` config (defaults `public` and
+`private`), and give each its own auth modes:
 
-- `default` — for channels like `orders` (broadcast as `/default/...`).
-- `orders` — for channels like `orders.{id}` / `private-orders.{id}`.
+- `public` — publish `AWS_IAM`; subscribe `AWS_LAMBDA` (and `API_KEY` when
+  anonymous public readers are allowed).
+- `private` — publish `AWS_IAM`; subscribe `AWS_LAMBDA` (your authorizer —
+  never `API_KEY`).
 
 If a client subscribes to a channel whose namespace does not exist, AppSync
 rejects the subscription with a `subscribe_error` and the broadcaster's
@@ -91,7 +94,7 @@ Grant AppSync permission to invoke it, scoped to the Event API:
 ## 4. Publish permissions for the Laravel app
 
 The IAM identity your servers use needs `appsync:EventPublish` on every
-channel namespace you broadcast to:
+channel namespace (both `public` and `private` with the defaults):
 
 ```json
 {
@@ -101,13 +104,17 @@ channel namespace you broadcast to:
             "Effect": "Allow",
             "Action": "appsync:EventPublish",
             "Resource": [
-                "arn:aws:appsync:<region>:<account>:apis/<api-id>/channelNamespace/default",
-                "arn:aws:appsync:<region>:<account>:apis/<api-id>/channelNamespace/orders"
+                "arn:aws:appsync:<region>:<account>:apis/<api-id>/channelNamespace/public",
+                "arn:aws:appsync:<region>:<account>:apis/<api-id>/channelNamespace/private"
             ]
         }
     ]
 }
 ```
+
+Because IAM scopes at the channel-namespace level, the two namespaces are
+also the publish-isolation boundary — per-domain IAM isolation (a policy
+limited to `orders`, for example) is no longer expressible.
 
 ## 5. Wire up the environment
 

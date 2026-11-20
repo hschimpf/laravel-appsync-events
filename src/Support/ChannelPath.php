@@ -8,17 +8,18 @@ use InvalidArgumentException;
 
 /**
  * Maps a Laravel broadcasting channel name to an AWS AppSync Events
- * channel path of the form `/{namespace}/{type}/{segment}`.
+ * channel path of the form `/{namespace}/{segment}`.
  *
- * `{type}` is `private` or `public`, taken from the Laravel/Echo channel
- * prefix (`private-`, `private-encrypted-` or none). Presence channels
- * are out of scope for this package: a name starting with `presence-`
- * is rejected with an {@see InvalidArgumentException}. The rest of the
- * name is split on `.`: the first part becomes the AppSync channel
- * namespace (falling back to the default namespace when there is no dot)
- * and each remaining part becomes a path segment. Dashes stay literal,
- * so `orders.1.items` (`/orders/public/1/items`) and `orders.1-items`
- * (`/orders/public/1-items`) are different channels.
+ * `{namespace}` is the public or private namespace, taken from the
+ * Laravel/Echo channel prefix (`private-` or none). Namespaces are the
+ * AppSync authorization boundary, so the channel type is mapped onto
+ * them directly. `private-encrypted-` channels are rejected because
+ * payload encryption is not implemented by this package, and presence
+ * channels are out of scope: a name starting with `presence-` is
+ * rejected with an {@see InvalidArgumentException} as well. The rest of
+ * the name is split on `.` and each part becomes a path segment. Dashes
+ * stay literal, so `orders.1.items` (`/public/orders/1/items`) and
+ * `orders.1-items` (`/public/orders/1-items`) are different channels.
  *
  * AppSync channel paths are limited to 1–5 segments, each 1–50
  * characters alphanumeric with interior dashes (`[A-Za-z0-9-]`, no
@@ -37,30 +38,34 @@ final class ChannelPath
     private const SEGMENT_PATTERN = '/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,48}[A-Za-z0-9])?$/';
 
     /**
-     * The channel prefixes that mark guarded Laravel channels, longest
-     * first so `private-encrypted-` wins over `private-`.
-     *
-     * @var array<string, string>
-     */
-    private const TYPES = [
-        'private-encrypted-' => 'private',
-        'private-' => 'private',
-    ];
-
-    /**
      * Build the AppSync channel path for a Laravel channel name.
      *
      * @param  string  $channelName  The channel name as it appears on the wire
      *                               (e.g. `private-orders.1`, `orders`).
-     * @param  string  $defaultNamespace  The AppSync namespace used when the name
-     *                                    carries no `.`-separated namespace part.
-     * @return string The channel path `/{namespace}/{type}/{segment}`.
+     * @param  string  $publicNamespace  The AppSync namespace for public channels.
+     * @param  string  $privateNamespace  The AppSync namespace for private channels.
+     * @return string The channel path `/{namespace}/{segment}`.
      *
-     * @throws InvalidArgumentException When the name is a presence channel or
-     *                                  would produce an invalid channel path.
+     * @throws InvalidArgumentException When the namespaces are invalid or equal,
+     *                                  the name is a presence or private-encrypted
+     *                                  channel, or would produce an invalid
+     *                                  channel path.
      */
-    public static function from(string $channelName, string $defaultNamespace = 'default'): string
-    {
+    public static function from(
+        string $channelName,
+        string $publicNamespace = 'public',
+        string $privateNamespace = 'private',
+    ): string {
+        self::assertValidNamespace($publicNamespace, 'public');
+        self::assertValidNamespace($privateNamespace, 'private');
+
+        if ($publicNamespace === $privateNamespace) {
+            throw new InvalidArgumentException(sprintf(
+                'The public and private namespaces must differ: both are "%s".',
+                $publicNamespace,
+            ));
+        }
+
         if (str_starts_with($channelName, 'presence-')) {
             throw new InvalidArgumentException(sprintf(
                 'Channel name "%s" is not supported: presence channels (presence- prefix) are not supported by AppSync Events.',
@@ -68,41 +73,55 @@ final class ChannelPath
             ));
         }
 
-        $type = 'public';
-        $name = $channelName;
-
-        foreach (self::TYPES as $prefix => $prefixType) {
-            if (str_starts_with($channelName, $prefix)) {
-                $type = $prefixType;
-                $name = substr($channelName, strlen($prefix));
-                break;
-            }
-        }
-
-        if (str_contains($name, '.')) {
-            $parts = explode('.', $name);
-            $namespace = array_shift($parts);
-            $segments = $parts;
-        } else {
-            $namespace = $defaultNamespace;
-            $segments = [$name];
-        }
-
-        if (count($segments) > 3) {
+        if (str_starts_with($channelName, 'private-encrypted-')) {
             throw new InvalidArgumentException(sprintf(
-                'Channel name "%s" produces too many AppSync channel path segments: %d exceeds the limit of 5 segments (namespace, type and at most 3 name segments).',
+                'Channel name "%s" is not supported: payload encryption is not implemented by this package, so private-encrypted channels are not supported (use private-).',
                 $channelName,
-                count($segments) + 2,
             ));
         }
 
-        self::assertValidSegment($namespace, 'namespace', $channelName);
+        if (str_starts_with($channelName, 'private-')) {
+            $namespace = $privateNamespace;
+            $name = substr($channelName, strlen('private-'));
+        } else {
+            $namespace = $publicNamespace;
+            $name = $channelName;
+        }
+
+        $segments = explode('.', $name);
+
+        if (count($segments) > 4) {
+            throw new InvalidArgumentException(sprintf(
+                'Channel name "%s" produces too many AppSync channel path segments: %d exceeds the limit of 5 segments (namespace and at most 4 channel name segments).',
+                $channelName,
+                count($segments) + 1,
+            ));
+        }
 
         foreach ($segments as $segment) {
             self::assertValidSegment($segment, 'channel', $channelName);
         }
 
-        return "/{$namespace}/{$type}/".implode('/', $segments);
+        return "/{$namespace}/".implode('/', $segments);
+    }
+
+    /**
+     * Ensure a configured namespace is a valid AppSync path segment.
+     *
+     * @param  string  $namespace  The namespace to validate.
+     * @param  string  $kind  Which namespace it is, for the error message.
+     *
+     * @throws InvalidArgumentException When the namespace is malformed.
+     */
+    private static function assertValidNamespace(string $namespace, string $kind): void
+    {
+        if (! (preg_match(self::SEGMENT_PATTERN, $namespace) === 1)) {
+            throw new InvalidArgumentException(sprintf(
+                'The %s namespace "%s" is not a valid AppSync channel namespace: it must be 1–50 characters, alphanumeric at both ends with dashes allowed inside ([A-Za-z0-9-]).',
+                $kind,
+                $namespace,
+            ));
+        }
     }
 
     /**

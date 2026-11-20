@@ -30,13 +30,14 @@ it('honours per-connection overrides', function (): void {
         'driver' => 'appsync',
         'http_endpoint' => 'https://customid.appsync-api.ap-southeast-2.amazonaws.com/event',
         'signing_secret' => 'connection-secret',
-        'default_namespace' => 'tenant',
+        'namespaces' => ['public' => 'tenant-pub', 'private' => 'tenant'],
     ]);
 
     $broadcaster = Broadcast::connection('appsync');
 
-    // default_namespace override flows into channel path resolution.
-    expect($broadcaster->channelPath('private-solo'))->toBe('/tenant/private/solo');
+    // namespaces override flows into channel path resolution.
+    expect($broadcaster->channelPath('private-solo'))->toBe('/tenant/solo')
+        ->and($broadcaster->channelPath('solo'))->toBe('/tenant-pub/solo');
 
     // the subscribe token is signed with the connection secret, not the
     // package-wide one.
@@ -47,7 +48,7 @@ it('honours per-connection overrides', function (): void {
 
     $claims = (new TokenSigner('connection-secret'))->verify($token);
     expect($claims['uid'])->toBe('7')
-        ->and($claims['channel'])->toBe('/orders/private/9');
+        ->and($claims['channel'])->toBe('/tenant/orders/9');
 
     expect(static fn () => (new TokenSigner('default-secret'))->verify($token))
         ->toThrow(InvalidTokenException::class);

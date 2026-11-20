@@ -49,7 +49,8 @@ The plain Echo option shape works too:
 | `credentials` | `RequestCredentials` | — | `fetch` credentials mode for the auth request (`'include'` for cross-origin cookies). |
 | `authorizer` | `(channelName, socketId) => Promise<string>` | — | Custom per-channel authorizer, replacing the `authEndpoint` POST. |
 | `publicApiKey` | `string` | — | AppSync API key used to connect and subscribe **public** channels without tokens. |
-| `defaultNamespace` | `string` | `'default'` | AppSync namespace for channel names without a dot. Must match the backend's `appsync-events.default_namespace`. |
+| `publicNamespace` | `string` | `'public'` | AppSync namespace public channels map onto. Must match the backend's `appsync-events.namespaces.public`. |
+| `privateNamespace` | `string` | `'private'` | AppSync namespace `private-` channels map onto. Must match the backend's `appsync-events.namespaces.private`. |
 | `namespace` | `string \| false` | `'App.Events'` | Echo event-namespace prefix; `false` disables Echo's namespace formatting. |
 | `debug` | `boolean` | `false` | Log protocol frames to the console. |
 | `WebSocket` | constructor | global `WebSocket` | Custom WebSocket implementation (tests, non-browser runtimes). |
@@ -64,7 +65,7 @@ Unknown options pass through to Echo.
   `echo.join()` (presence) throws — presence channels aren't supported,
   and `presence-` channel names are rejected (`InvalidChannelNameError`).
 - Channel names map to AppSync paths like the PHP side:
-  `private-orders.1` → `/orders/private/1`.
+  `private-orders.1` → `/private/orders/1`.
 - `disconnect()` stops reconnects; `connect()` re-subscribes every pending
   channel and re-fetches tokens/auth.
 - `socketId()` is a stable id reported to the auth endpoint — it is not an

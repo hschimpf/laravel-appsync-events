@@ -230,7 +230,7 @@ describe('subscriptions', () => {
         const subscribe = socket.sentFrames.find((frame) => frame.type === 'subscribe');
         expect(subscribe).toMatchObject({
             id: channel.subscriptionId,
-            channel: '/orders/private/1',
+            channel: '/private/orders/1',
             authorization: { host: HTTP_HOST, Authorization: 'subscribe-token' },
         });
 
@@ -272,7 +272,7 @@ describe('subscriptions', () => {
         const subscribe = socket.sentFrames.find((frame) => frame.type === 'subscribe');
         expect(subscribe).toMatchObject({
             id: channel.subscriptionId,
-            channel: '/orders/private/1',
+            channel: '/private/orders/1',
             authorization: { host: HTTP_HOST, Authorization: 'subscribe-token' },
         });
     });
@@ -358,7 +358,7 @@ describe('subscriptions', () => {
         await tick();
 
         expect(socket.sentFrames.find((frame) => frame.type === 'subscribe')).toMatchObject({
-            channel: '/default/public/news',
+            channel: '/public/news',
             authorization: { host: HTTP_HOST },
         });
     });
@@ -371,21 +371,21 @@ describe('subscriptions', () => {
         await tick();
 
         expect(socket.sentFrames.find((frame) => frame.type === 'subscribe')).toMatchObject({
-            channel: '/default/public/news',
+            channel: '/public/news',
             authorization: { host: HTTP_HOST, 'x-api-key': 'da2-key' },
         });
     });
 
-    it('maps channel names using a custom defaultNamespace', async () => {
-        const { connector } = makeConnector({ defaultNamespace: 'tenant' });
+    it('maps channel names using custom namespaces', async () => {
+        const { connector } = makeConnector({ publicNamespace: 'tenant-pub', privateNamespace: 'tenant' });
         const socket = await connectAndAck(connector);
 
         connector.privateChannel('solo');
+        connector.channel('solo');
         await tick();
 
-        expect(socket.sentFrames.find((frame) => frame.type === 'subscribe')).toMatchObject({
-            channel: '/tenant/private/solo',
-        });
+        const subscribes = socket.sentFrames.filter((frame) => frame.type === 'subscribe');
+        expect(subscribes.map((frame) => frame.channel).sort()).toEqual(['/tenant-pub/solo', '/tenant/solo']);
     });
 
     it('invokes error callbacks on subscribe_error', async () => {

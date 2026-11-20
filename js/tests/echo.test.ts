@@ -54,7 +54,7 @@ describe('laravel-echo integration', () => {
 
         expect(fetchMock).toHaveBeenCalledWith('/broadcasting/auth', expect.objectContaining({ method: 'POST' }));
         const subscribe = socket.sentFrames.find((frame) => frame.type === 'subscribe');
-        expect(subscribe).toMatchObject({ channel: '/orders/private/1' });
+        expect(subscribe).toMatchObject({ channel: '/private/orders/1' });
 
         socket.serverSend({
             type: 'data',
@@ -155,7 +155,7 @@ describe('laravel-echo integration', () => {
         await tick();
 
         const subscribe = socket.sentFrames.find((frame) => frame.type === 'subscribe');
-        expect(subscribe).toMatchObject({ channel: '/default/public/news' });
+        expect(subscribe).toMatchObject({ channel: '/public/news' });
 
         socket.serverSend({
             type: 'data',

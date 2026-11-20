@@ -106,10 +106,18 @@ export interface AppSyncConnectorOptions {
     publicApiKey?: string;
 
     /**
-     * The AppSync namespace used for channel names without a
-     * `.`-separated namespace part. Defaults to `'default'`.
+     * The AppSync namespace public channel names are mapped onto.
+     * Defaults to `'public'`; must match a namespace created on the
+     * Event API.
      */
-    defaultNamespace?: string;
+    publicNamespace?: string;
+
+    /**
+     * The AppSync namespace `private-` channel names are mapped onto.
+     * Defaults to `'private'`; must match a namespace created on the
+     * Event API.
+     */
+    privateNamespace?: string;
 
     /**
      * The Echo event namespace (like other connectors). Defaults to
@@ -154,7 +162,8 @@ export interface AppSyncConnectorOptions {
  */
 export type ResolvedAppSyncConnectorOptions = AppSyncConnectorOptions & {
     authEndpoint: string;
-    defaultNamespace: string;
+    publicNamespace: string;
+    privateNamespace: string;
     debug: boolean;
     WebSocket: AppSyncWebSocketConstructor;
     fetch: typeof fetch;

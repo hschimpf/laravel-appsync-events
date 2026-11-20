@@ -33,15 +33,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InvalidChannelNameError` instead of mapping them to a `presence`
   path; presence channels are out of scope for the package.
 - **Dots in channel names now map to path separators (BREAKING)** —
-  `private-orders.1.items` publishes to `/orders/private/1/items`
-  instead of `/orders/private/1-items`, fixing a collision where
+  `private-orders.1.items` publishes to `/private/orders/1/items`
+  instead of `/private/orders/1-items`, fixing a collision where
   `orders.1.items` and `orders.1-items` mapped to the same path while
   subscribe tokens are scoped per path. Segments also follow AppSync
   limits now: max 5 path segments, each 1–50 chars `[A-Za-z0-9-]` —
   underscores and over-long/too-many segments are rejected.
-  Namespaces and IAM policies are unaffected (they're namespace-scoped),
-  but subscribers or handlers hard-coding dash-mapped paths must be
+  Subscribers or handlers hard-coding dash-mapped paths must be
   updated.
+- **Channel paths are now `/{namespace}/{name…}` — type-as-namespace
+  (BREAKING)** — `private-` channels resolve under the private namespace
+  and everything else under the public namespace; the rest of the name
+  splits on dots into path segments (`private-orders.1` →
+  `/private/orders/1`, `orders` → `/public/orders`). The `{domain}/{type}`
+  mapping, domain-as-namespace and the `default_namespace` fallback are
+  gone, `private-encrypted-` names are now rejected (payload encryption
+  is not implemented), and a name may use at most 4 dot-segments. To
+  migrate:
+    1. Recreate the Event API's channel namespaces as `public` and
+       `private` — namespaces are the AppSync authorization boundary, so
+       set auth modes per namespace (e.g. `API_KEY` + Lambda for
+       `public`, the Lambda authorizer for `private`) — and drop the old
+       per-prefix namespaces (`orders`, `default`, …).
+    2. Replace `default_namespace`/`APPSYNC_DEFAULT_NAMESPACE` with
+       `namespaces.public`/`namespaces.private`
+       (`APPSYNC_PUBLIC_NAMESPACE`/`APPSYNC_PRIVATE_NAMESPACE`).
+    3. Replace the connector's `defaultNamespace` option with
+       `publicNamespace`/`privateNamespace` (`clientConfig()` now ships
+       both keys).
+    4. Re-scope `appsync:EventPublish` IAM statements to the two
+       `channelNamespace/{public,private}` ARNs — per-domain namespace
+       isolation is gone.
 
 ## [0.1.2] - 2026-11-18
 

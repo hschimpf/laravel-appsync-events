@@ -90,21 +90,35 @@ Resources:
                         - AuthType: API_KEY
                         - !Ref AWS::NoValue
 
-    # One AWS::AppSync::ChannelNamespace resource per AppSync namespace used
-    # by your channel names: the first dot-segment of a Laravel channel name
-    # becomes the namespace (`orders.1` -> /orders/…), and dotless names use
-    # the configured `default_namespace` (default: `default`).
-    DefaultNamespace:
+    # The two namespaces channel names map onto: `private-` channels under
+    # `private`, everything else under `public` (rename both to match your
+    # `appsync-events.namespaces` config). Namespaces are the AppSync
+    # authorization boundary: `private` requires the Lambda authorizer for
+    # subscribes; `public` also accepts API_KEY when PublicChannels is
+    # enabled. Both publish over IAM only.
+    PublicNamespace:
         Type: AWS::AppSync::ChannelNamespace
         Properties:
             ApiId: !GetAtt EventApi.ApiId
-            Name: default
+            Name: public
+            PublishAuthModes:
+                - AuthType: AWS_IAM
+            SubscribeAuthModes:
+                - AuthType: AWS_LAMBDA
+                - !If
+                    - EnableApiKey
+                    - AuthType: API_KEY
+                    - !Ref AWS::NoValue
 
-    OrdersNamespace:
+    PrivateNamespace:
         Type: AWS::AppSync::ChannelNamespace
         Properties:
             ApiId: !GetAtt EventApi.ApiId
-            Name: orders
+            Name: private
+            PublishAuthModes:
+                - AuthType: AWS_IAM
+            SubscribeAuthModes:
+                - AuthType: AWS_LAMBDA
 
     AuthorizerInvokePermission:
         Type: AWS::Lambda::Permission

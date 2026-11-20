@@ -36,7 +36,7 @@ it('issues a subscribe token for an authorized private channel', function (): vo
     $claims = (new TokenSigner('route-secret'))->verify($response->json('auth'));
 
     expect($claims['purpose'])->toBe('subscribe')
-        ->and($claims['channel'])->toBe('/orders/private/5')
+        ->and($claims['channel'])->toBe('/private/orders/5')
         ->and($claims['uid'])->toBe('7')
         ->and($claims['exp'])->toBeGreaterThanOrEqual(time() + 3590)->toBeLessThanOrEqual(time() + 3610);
 });

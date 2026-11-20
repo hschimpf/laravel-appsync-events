@@ -31,7 +31,8 @@ function broadcasterWithMock(array $responses, array &$history, array $options =
         signer: new TokenSigner('test-secret'),
         httpEndpoint: $options['endpoint'] ?? 'https://abc123.appsync-api.eu-west-1.amazonaws.com/event',
         region: $options['region'] ?? null,
-        defaultNamespace: $options['defaultNamespace'] ?? 'default',
+        publicNamespace: $options['publicNamespace'] ?? 'public',
+        privateNamespace: $options['privateNamespace'] ?? 'private',
         uidResolver: $options['uidResolver'] ?? null,
         client: new Client(['handler' => $stack, 'http_errors' => false]),
         credentialProvider: $options['credentialProvider']
@@ -56,16 +57,16 @@ it('sends one signed POST per channel', function (): void {
         ->and((string) $requestA->getUri())->toBe('https://abc123.appsync-api.eu-west-1.amazonaws.com/event');
 
     $bodyA = json_decode((string) $requestA->getBody(), true);
-    expect($bodyA['channel'])->toBe('/orders/private/1')
+    expect($bodyA['channel'])->toBe('/private/orders/1')
         ->and($bodyA['events'])->toHaveCount(1);
 
     $messageA = json_decode($bodyA['events'][0], true);
     expect($messageA['event'])->toBe('OrderUpdated')
-        ->and($messageA['channel'])->toBe('/orders/private/1')
+        ->and($messageA['channel'])->toBe('/private/orders/1')
         ->and($messageA['data'])->toBe(['id' => 1]);
 
     $bodyB = json_decode((string) $requestB->getBody(), true);
-    expect($bodyB['channel'])->toBe('/orders/public/2');
+    expect($bodyB['channel'])->toBe('/public/orders/2');
 });
 
 it('lifts a non-empty payload socket into the event envelope for toOthers()', function (mixed $socket, string $expected): void {
@@ -137,7 +138,7 @@ it('throws a BroadcastException mentioning path and status on non-2xx', function
         $broadcaster->broadcast([new PrivateChannel('orders.1')], 'Updated', []);
         $this->fail('Expected BroadcastException');
     } catch (BroadcastException $e) {
-        expect($e->getMessage())->toContain('/orders/private/1')->toContain('500');
+        expect($e->getMessage())->toContain('/private/orders/1')->toContain('500');
     }
 });
 
@@ -154,7 +155,7 @@ it('wraps connection errors in a BroadcastException with the previous', function
         $this->fail('Expected BroadcastException');
     } catch (BroadcastException $e) {
         expect($e->getPrevious())->toBeInstanceOf(ConnectException::class)
-            ->and($e->getMessage())->toContain('/default/public/orders');
+            ->and($e->getMessage())->toContain('/public/orders');
     }
 });
 
@@ -187,10 +188,15 @@ it('resolves the credential provider once per broadcast call', function (): void
 });
 
 it('maps channel names to AppSync channel paths', function (): void {
-    $broadcaster = new AppSyncBroadcaster(new TokenSigner('s'), 'https://x.example/event', defaultNamespace: 'app');
+    $broadcaster = new AppSyncBroadcaster(
+        new TokenSigner('s'),
+        'https://x.example/event',
+        publicNamespace: 'app-pub',
+        privateNamespace: 'app-priv',
+    );
 
-    expect($broadcaster->channelPath('private-orders.1'))->toBe('/orders/private/1')
-        ->and($broadcaster->channelPath('plain'))->toBe('/app/public/plain');
+    expect($broadcaster->channelPath('private-orders.1'))->toBe('/app-priv/orders/1')
+        ->and($broadcaster->channelPath('plain'))->toBe('/app-pub/plain');
 });
 
 function authRequest(string $channelName, ?GenericUser $user): Request
@@ -237,10 +243,10 @@ it('returns a verifiable subscribe token for an authorized channel', function ()
         ->and($claims['exp'])->toBeGreaterThan(time());
 });
 
-it('honours a custom uid resolver and default namespace', function (): void {
+it('honours a custom uid resolver and namespaces', function (): void {
     $history = [];
     $broadcaster = broadcasterWithMock([], $history, [
-        'defaultNamespace' => 'app',
+        'publicNamespace' => 'app',
         'uidResolver' => static fn ($user): string => 'uuid-'.$user->getAuthIdentifier(),
     ]);
     $broadcaster->channel('room', static fn ($user): bool => true);
@@ -250,5 +256,5 @@ it('honours a custom uid resolver and default namespace', function (): void {
     $claims = (new TokenSigner('test-secret'))->verify($response['auth']);
 
     expect($claims['uid'])->toBe('uuid-7')
-        ->and($claims['channel'])->toBe('/app/public/room');
+        ->and($claims['channel'])->toBe('/app/room');
 });

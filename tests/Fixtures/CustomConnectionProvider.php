@@ -21,7 +21,7 @@ final class CustomConnectionProvider extends ServiceProvider
         'driver' => 'appsync',
         'http_endpoint' => 'https://customid.appsync-api.ap-southeast-2.amazonaws.com/event',
         'signing_secret' => 'connection-secret',
-        'default_namespace' => 'tenant',
+        'namespaces' => ['public' => 'tenant-pub', 'private' => 'tenant'],
     ];
 
     /**

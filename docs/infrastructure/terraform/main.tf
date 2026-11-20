@@ -30,9 +30,9 @@ variable "authorizer_function_arn" {
 }
 
 variable "namespaces" {
-  description = "AppSync channel namespaces to create (one per dot-prefix used in channel names, plus the default namespace)."
+  description = "AppSync channel namespaces to create — the authorization boundary channel names map onto (`private-` names under `private`, everything else under `public`)."
   type        = set(string)
-  default     = ["default", "orders"]
+  default     = ["public", "private"]
 }
 
 variable "public_channels" {
@@ -97,6 +97,21 @@ resource "aws_appsync_channel_namespace" "namespaces" {
 
   api_id = aws_appsync_api.events.api_id
   name   = each.value
+
+  publish_auth_mode {
+    auth_type = "AWS_IAM"
+  }
+
+  # `private` subscribes only via the Lambda authorizer; other namespaces
+  # also accept API_KEY when public channels are enabled.
+  dynamic "subscribe_auth_mode" {
+    for_each = each.value == "private" ? ["AWS_LAMBDA"] : (
+      var.public_channels ? ["AWS_LAMBDA", "API_KEY"] : ["AWS_LAMBDA"]
+    )
+    content {
+      auth_type = subscribe_auth_mode.value
+    }
+  }
 }
 
 resource "aws_lambda_permission" "appsync_authorizer" {

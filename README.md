@@ -41,7 +41,7 @@ flowchart LR
 ```
 
 1. A `ShouldBroadcast` event fires; `AppSyncBroadcaster` SigV4-signs a `POST /event` to the Event API's HTTP endpoint with IAM credentials.
-2. AppSync delivers the event to every client subscribed to the mapped channel path (`/orders/private/1` for `private-orders.1`).
+2. AppSync delivers the event to every client subscribed to the mapped channel path (`/private/orders/1` for `private-orders.1`).
 3. The browser connects with a **connect token** (from `AppSyncEvents::clientConfig()`) and asks your app for a per-channel **subscribe token** via `POST /broadcasting/auth` — the standard Echo channel-auth flow.
 4. AppSync calls your **Lambda authorizer** for `EVENT_CONNECT` and `EVENT_SUBSCRIBE`; `AppSyncAuthorizer` verifies the token's HMAC signature, purpose and channel.
 5. `EVENT_PUBLISH` is always denied — clients can never publish; publishing is a server-side, IAM-only operation.
@@ -124,14 +124,14 @@ echo.private('orders.1').listen('.OrderShipped', (e: unknown) => {
 });
 ```
 
-The Laravel channel name `private-orders.1` (Echo adds `private-`) maps to the AppSync channel path `/orders/private/1` — so an `orders` channel namespace must exist on the Event API.
+The Laravel channel name `private-orders.1` (Echo adds `private-`) maps to the AppSync channel path `/private/orders/1` — so a `private` channel namespace must exist on the Event API.
 
 ## AWS setup
 
 Before the driver works, AWS needs:
 
 - an **Event API** with auth providers `AWS_LAMBDA` + `AWS_IAM` (plus `API_KEY` only if you use public channels), connection mode `AWS_LAMBDA`, default publish mode `AWS_IAM`, default subscribe mode `AWS_LAMBDA`;
-- **channel namespaces** matching your channel-name prefixes (e.g. `orders`, `default`);
+- the **`public` and `private` channel namespaces** (or your configured names) — AppSync namespaces are the authorization boundary, so the `private` namespace subscribes via your Lambda authorizer while `public` may also allow `API_KEY`;
 - a **Lambda authorizer** holding the same `APPSYNC_CHANNEL_SIGNING_SECRET`, with a `lambda:InvokeFunction` resource policy for `appsync.amazonaws.com` scoped to the API ARN;
 - an **IAM policy** granting your app's role `appsync:EventPublish` on `arn:aws:appsync:<region>:<account>:apis/<api-id>/channelNamespace/<namespace>`.
 
@@ -240,7 +240,8 @@ functions:
 | `signing_secret` | `APPSYNC_CHANNEL_SIGNING_SECRET` | — | HMAC secret shared with the Lambda authorizer. **Required.** |
 | `previous_signing_secrets` | `APPSYNC_CHANNEL_PREVIOUS_SIGNING_SECRETS` | — | Comma-separated previous secrets still accepted for verification during rotation; never used for signing. Optional. |
 | `region` | `APPSYNC_REGION` → `AWS_DEFAULT_REGION` | `us-east-1` | SigV4 region fallback when it can't be parsed from `http_endpoint`. |
-| `default_namespace` | `APPSYNC_DEFAULT_NAMESPACE` | `default` | Namespace for channel names without a dot. |
+| `namespaces.public` | `APPSYNC_PUBLIC_NAMESPACE` | `public` | AppSync namespace public channel names map onto; must exist on the Event API. |
+| `namespaces.private` | `APPSYNC_PRIVATE_NAMESPACE` | `private` | AppSync namespace `private-` channel names map onto; must exist on the Event API. |
 | `tokens.connect_ttl` | — | `43200` | Connect token lifetime, seconds (12 h). |
 | `tokens.subscribe_ttl` | — | `3600` | Subscribe token lifetime, seconds (1 h). |
 | `authorizer.cache_ttl` | — | `300` | `ttlOverride` the authorizer returns for authorized calls. |
@@ -257,7 +258,7 @@ functions:
 
 ### Per-connection overrides
 
-The `appsync` broadcasting connection merges over the package config, so `config/broadcasting.php` may override `http_endpoint`, `signing_secret`, `previous_signing_secrets`, `region`, `default_namespace` and `http.*` per connection. A connection that sets its own `signing_secret` must also set its own `previous_signing_secrets` — the package-level previous list is never carried onto a different primary secret:
+The `appsync` broadcasting connection merges over the package config, so `config/broadcasting.php` may override `http_endpoint`, `signing_secret`, `previous_signing_secrets`, `region`, `namespaces` and `http.*` per connection. A connection that sets its own `signing_secret` must also set its own `previous_signing_secrets` — the package-level previous list is never carried onto a different primary secret:
 
 ```php
 'connections' => [
@@ -272,7 +273,7 @@ The `appsync` broadcasting connection merges over the package config, so `config
 
 | Method | Returns |
 | --- | --- |
-| `AppSyncEvents::clientConfig(?Authenticatable $user = null)` | Connector options `{wsEndpoint, httpHost, connectToken, authEndpoint, defaultNamespace, inactivityTimeout}` — `null` for guests. The `connectToken` is a static string minted once. |
+| `AppSyncEvents::clientConfig(?Authenticatable $user = null)` | Connector options `{wsEndpoint, httpHost, connectToken, authEndpoint, publicNamespace, privateNamespace, inactivityTimeout}` — `null` for guests. The `connectToken` is a static string minted once. |
 | `AppSyncEvents::uid($user)` | The `uid` claim for tokens: runtime closure → `uid_resolver` class → `getAuthIdentifier()`. |
 | `AppSyncEvents::resolveUidUsing(Closure)` | Set the uid strategy at runtime (config is not a place for closures). |
 | `AppSyncEvents::signer()` | The `TokenSigner` bound to `signing_secret` (`connectToken()`, `subscribeToken()`). |
@@ -408,29 +409,30 @@ This is client-side filtering — AppSync has no server-side sender exclusion, s
 
 ## Channel names and AppSync channel paths
 
-Laravel channel names map to AppSync channel paths `/{namespace}/{type}/{segment}[/{segment}…]` — the mapping is identical in PHP (`ChannelPath`) and TS (`toAppSyncChannel`), verified against a shared fixture:
+Laravel channel names map to AppSync channel paths `/{namespace}/{segment}[/{segment}…]` — the mapping is identical in PHP (`ChannelPath`) and TS (`toAppSyncChannel`), verified against a shared fixture:
 
 | Laravel channel name | AppSync channel path |
 | --- | --- |
-| `orders` | `/default/public/orders` |
-| `orders.1` | `/orders/public/1` |
-| `orders.1.items` | `/orders/public/1/items` |
-| `orders.1-items` | `/orders/public/1-items` |
-| `private-orders.1` | `/orders/private/1` |
+| `orders` | `/public/orders` |
+| `orders.1` | `/public/orders/1` |
+| `orders.1.items` | `/public/orders/1/items` |
+| `orders.1-items` | `/public/orders/1-items` |
+| `private-orders.1` | `/private/orders/1` |
 | `private-private.abc` | `/private/private/abc` |
-| `private-orders.1.items` | `/orders/private/1/items` |
-| `private-orders.550e8400-e29b-41d4-a716-446655440000` | `/orders/private/550e8400-e29b-41d4-a716-446655440000` |
-| `private-encrypted-orders.9` | `/orders/private/9` |
-| `private-solo` | `/default/private/solo` |
-| `privateer.x` | `/privateer/public/x` |
+| `private-orders.1.items` | `/private/orders/1/items` |
+| `private-orders.550e8400-e29b-41d4-a716-446655440000` | `/private/orders/550e8400-e29b-41d4-a716-446655440000` |
+| `private-solo` | `/private/solo` |
+| `privateer.x` | `/public/privateer/x` |
 
 Rules:
 
-- Channel-type prefixes `private-` and `private-encrypted-` (encrypted maps to `private`) select the `{type}` segment; everything else is `public`. Prefixes are exact — `privateer.x` is public.
+- The `private-` prefix selects the **private namespace** (`namespaces.private`, default `private`); everything else maps under the **public namespace** (`namespaces.public`, default `public`). Prefixes are exact — `privateer.x` is public.
+- `private-encrypted-` names are rejected (`InvalidArgumentException` / `InvalidChannelNameError`) — payload encryption is not implemented by this package; use `private-`.
 - `presence-` names are rejected (`InvalidArgumentException` / `InvalidChannelNameError`) — presence channels are out of scope.
-- The first dot-segment is the **namespace**; each further dot-part becomes a path segment (at most 3 — AppSync paths are capped at 5 segments total). Dotless names use `default_namespace` (`default` unless configured).
+- Each dot-part of the remaining name becomes a path segment (at most 4 — AppSync paths are capped at 5 segments total including the namespace).
 - `-` stays literal inside segments, so `orders.1.items` and `orders.1-items` are **different channels** (subscribe tokens are scoped to the path — keep that in mind when picking names).
-- **Create one channel namespace per prefix you use** — subscribing or publishing to a missing namespace fails.
+- Namespace names are configurable (`namespaces.public` / `namespaces.private`) but are the **AppSync authorization boundary** — they must match the namespaces created on the Event API, and each namespace can carry its own auth mode (e.g. `API_KEY` + Lambda for `public`, Lambda authorizer for `private`).
+- Subscribing or publishing to a missing namespace fails (subscribe_error / 404 `BroadcastException`).
 - Each segment is 1–50 chars, alphanumeric at both ends with `[A-Za-z0-9-]` inside — underscores are not allowed in AppSync channel paths. Invalid names throw `InvalidArgumentException` (PHP) / `InvalidChannelNameError` (JS) instead of hitting the API.
 
 ## Security model

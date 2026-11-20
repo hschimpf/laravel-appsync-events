@@ -104,13 +104,14 @@ final class AppSyncEventsManager
      *
      * The returned array uses camelCase keys matching the
      * `laravel-echo-appsync` connector options: `wsEndpoint`, `httpHost`,
-     * `connectToken`, `authEndpoint`, `defaultNamespace` and
-     * `inactivityTimeout`. Returns `null` for guests.
+     * `connectToken`, `authEndpoint`, `publicNamespace`, `privateNamespace`
+     * and `inactivityTimeout`. Returns `null` for guests.
      *
      * @param  Authenticatable|null  $user  The user to configure; defaults
      *                                      to the current user of the default guard.
      * @return array{wsEndpoint: string, httpHost: string, connectToken: string,
-     *     authEndpoint: string, defaultNamespace: string, inactivityTimeout: int}|null
+     *     authEndpoint: string, publicNamespace: string, privateNamespace: string,
+     *     inactivityTimeout: int}|null
      *
      * @throws ConfigurationException When the realtime endpoint, HTTP
      *                                endpoint or signing secret is missing.
@@ -141,7 +142,8 @@ final class AppSyncEventsManager
                 (int) $this->config->get('appsync-events.tokens.connect_ttl', 43200),
             ),
             'authEndpoint' => $this->config->get('appsync-events.client.auth_endpoint', '/broadcasting/auth'),
-            'defaultNamespace' => $this->config->get('appsync-events.default_namespace', 'default'),
+            'publicNamespace' => $this->config->get('appsync-events.namespaces.public', 'public'),
+            'privateNamespace' => $this->config->get('appsync-events.namespaces.private', 'private'),
             'inactivityTimeout' => (int) $this->config->get('appsync-events.client.inactivity_timeout', 10),
         ];
     }

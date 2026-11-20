@@ -36,7 +36,7 @@ final class EmulatorSuite
      *
      * @var array<int, string>
      */
-    private const NAMESPACES = ['orders', 'default', 'notify'];
+    private const NAMESPACES = ['public', 'private'];
 
     /**
      * The shared Event API, or `null` when no emulator is reachable.

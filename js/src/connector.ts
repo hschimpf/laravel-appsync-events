@@ -149,7 +149,8 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
         super.setOptions(options);
 
         const resolved = this.opts;
-        resolved.defaultNamespace ??= 'default';
+        resolved.publicNamespace ??= 'public';
+        resolved.privateNamespace ??= 'private';
         resolved.debug ??= false;
         resolved.WebSocket ??= globalThis.WebSocket as unknown as ResolvedAppSyncConnectorOptions['WebSocket'];
         // A browser's fetch is a WebIDL operation that throws an "Illegal
@@ -595,7 +596,7 @@ export class AppSyncConnector extends Connector<any, AppSyncChannel, AppSyncChan
         const frame: SubscribeFrame = {
             type: 'subscribe',
             id: channel.subscriptionId,
-            channel: toAppSyncChannel(channel.name, opts.defaultNamespace),
+            channel: toAppSyncChannel(channel.name, opts.publicNamespace, opts.privateNamespace),
             authorization,
         };
 
