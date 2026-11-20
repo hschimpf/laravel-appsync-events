@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-19
+
+### Fixed
+
+- **Re-release of 0.2.0** — the Packagist `v0.2.0` was published from a commit
+  that predates the `js/package.json` version bump, and the tag was then moved
+  to the corrected commit (which Packagist refuses to follow). `0.2.1` brings
+  Packagist, npm and GitHub back in line. No PHP or JS code changes since
+  `0.2.0`; the only difference is the version in `js/package.json`.
+
 ## [0.2.0] - 2026-11-19
 
 This release reworks how Laravel channel names map to AppSync channel paths
@@ -181,7 +191,8 @@ since both sides must agree on the channel path.
 - **CI** — PHP 8.2–8.5 tests, lint and static analysis; Node 22/24 JS
   typecheck, build and tests.
 
-[Unreleased]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/hschimpf/laravel-appsync-events/compare/v0.1.0...v0.1.1
